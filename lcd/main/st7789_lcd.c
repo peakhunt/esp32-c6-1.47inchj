@@ -1,0 +1,145 @@
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
+#include "esp_log.h"
+#include "sdkconfig.h"
+
+#include "driver/spi_master.h"
+#include "driver/gpio.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_vendor.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#define LCD_HOST    SPI2_HOST
+#define PIN_NUM_MOSI 6
+#define PIN_NUM_CLK  7
+#define PIN_NUM_CS   14 
+#define PIN_NUM_DC   15
+#define PIN_NUM_RST  21
+#define PIN_NUM_BCKL 22
+
+#define LCD_WIDTH   172
+#define LCD_HEIGHT  320
+
+//static const char *TAG = "st7789_lcd";
+
+static esp_lcd_panel_handle_t _panel_handle;
+static esp_lcd_panel_io_handle_t _io_handle;
+static uint16_t *line_buf = NULL;
+
+void
+st7789_disp_on_off(bool on)
+{
+  esp_lcd_panel_disp_on_off(_panel_handle, on);
+}
+
+void
+st7789_backlight_on_off(bool on)
+{
+  gpio_set_level(PIN_NUM_BCKL, on ? 1 : 0);
+}
+
+void
+st7789_fill_screen(uint16_t color)
+{
+  for (int i = 0; i < LCD_WIDTH * LCD_HEIGHT; i++)
+  {
+    line_buf[i] = color;
+  }
+
+  ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(
+        _panel_handle,
+        0, 0, LCD_WIDTH, LCD_HEIGHT,
+        line_buf
+  ));
+}
+
+void
+st7789_fill_screen_pat(uint16_t pat1, uint16_t pat2, uint16_t pat3, uint16_t pat4, uint8_t offset)
+{
+  #define ROW_HEIGHT      40      // 8 rows
+  #define COL_WIDTH       43      // 4 columns
+
+  uint16_t patterns[4][4] = {
+    { pat1, pat2, pat3, pat4 },
+    { pat2, pat3, pat4, pat1 },
+    { pat3, pat4, pat1, pat2 },
+    { pat4, pat1, pat2, pat3 },
+  };
+
+  for(int row = 0; row < LCD_HEIGHT; row++)
+  {
+    for(int col = 0; col < LCD_WIDTH; col++)
+    {
+      int pat_row, pat_col;
+
+      pat_row = (offset + (row / ROW_HEIGHT) % 4) % 4;
+      pat_col = (col / COL_WIDTH);
+
+      line_buf[row * LCD_WIDTH + col] = patterns[pat_row][pat_col];
+    }
+  }
+  ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(
+        _panel_handle,
+        0, 0, LCD_WIDTH, LCD_HEIGHT,
+        line_buf
+  ));
+}
+
+void
+st7789_init_lcd(void)
+{
+  line_buf = (uint16_t*)heap_caps_malloc(LCD_WIDTH * LCD_HEIGHT * 2, MALLOC_CAP_DMA);
+  // Step 1: Configure SPI bus
+  spi_bus_config_t buscfg = {
+    .mosi_io_num = PIN_NUM_MOSI,
+    .miso_io_num = -1,
+    .sclk_io_num = PIN_NUM_CLK,
+    .quadwp_io_num = -1,
+    .quadhd_io_num = -1,
+    .max_transfer_sz = LCD_WIDTH * LCD_HEIGHT * 2 + 10,
+  };
+  ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO));
+
+  // Step 2: Create panel IO (SPI)
+  esp_lcd_panel_io_spi_config_t io_config = {
+    .cs_gpio_num = PIN_NUM_CS,
+    .dc_gpio_num = PIN_NUM_DC,
+    .spi_mode = 0,
+    .trans_queue_depth = 16,
+    .pclk_hz = 40 * 1000 * 1000,
+    .lcd_cmd_bits = 8,
+    .lcd_param_bits = 8,
+    .on_color_trans_done = NULL,
+    .user_ctx = NULL,
+  };
+  ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(LCD_HOST, &io_config, &_io_handle));
+
+  // Step 3: Create ST7789 panel driver
+  esp_lcd_panel_dev_config_t panel_config = {
+    .reset_gpio_num = PIN_NUM_RST,
+    .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+    .data_endian = LCD_RGB_DATA_ENDIAN_LITTLE,
+    .bits_per_pixel = 16,
+  };
+  ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(_io_handle, &panel_config, &_panel_handle));
+
+  // Step 4: Initialize panel
+  ESP_ERROR_CHECK(esp_lcd_panel_reset(_panel_handle));
+  ESP_ERROR_CHECK(esp_lcd_panel_init(_panel_handle));
+  ESP_ERROR_CHECK(esp_lcd_panel_invert_color(_panel_handle, true)); // XXX no idea why! maybe panel is built this way
+  ESP_ERROR_CHECK(esp_lcd_panel_set_gap(_panel_handle, 34, 0));     // XXX no idea why! I don't have panel spec
+  esp_lcd_panel_disp_on_off(_panel_handle, true);
+
+  // Step 5: Turn on backlight
+  gpio_config_t bklt_cfg = {
+    .pin_bit_mask = 1ULL << PIN_NUM_BCKL,
+    .mode = GPIO_MODE_OUTPUT,
+  };
+  gpio_config(&bklt_cfg);
+  gpio_set_level(PIN_NUM_BCKL, 1);
+}
