@@ -12,9 +12,12 @@
 #include <stdlib.h>
 #include <time.h>
 
-LV_IMG_DECLARE(page1_ui)
-LV_IMG_DECLARE(img4)
+LV_IMG_DECLARE(page0_ui)
+LV_IMG_DECLARE(glow)
 LV_IMG_DECLARE(img5)
+
+static lv_style_t style_white_font_20;
+static lv_style_t style_white_font_42;
 
 static uint8_t _current_page = 0;
 
@@ -34,6 +37,11 @@ static lv_obj_t* page0_lbl_c3;
 static lv_obj_t* page0_lbl_c4;
 static lv_obj_t* page0_lbl_a1;
 static lv_obj_t* page0_lbl_a2;
+
+//
+// Page 1 Data
+//
+static lv_obj_t* page1_lbl_total;
 
 static void
 my_lvgl_app_show_page(uint8_t page)
@@ -68,6 +76,7 @@ watt_simulator_cb(lv_timer_t * timer)
   int w4 = rand() % 141;
   int w5 = rand() % 141;
   int w6 = rand() % 141;
+  int total = w1 + w2 + w3 + w4 + w5 + w6;
 
   sprintf(buf, "%d W", w1);
   lv_label_set_text(page0_lbl_c1, buf);
@@ -87,6 +96,9 @@ watt_simulator_cb(lv_timer_t * timer)
   sprintf(buf, "%d W", w6);
   lv_label_set_text(page0_lbl_a2, buf);
 
+  sprintf(buf, "%d", total);
+  lv_label_set_text(page1_lbl_total, buf);
+
   lvgl_port_unlock();
 }
 
@@ -103,11 +115,31 @@ my_lvgl_app_init_page2(void)
 static void
 my_lvgl_app_init_page1(void)
 {
+  lv_obj_t * scr = lv_scr_act();  // get the active screen
+  lv_obj_set_style_bg_color(scr, lv_color_black(), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
+
   lv_obj_t * bg = lv_img_create(lv_scr_act());
-  lv_img_set_src(bg, &img4);
-  lv_obj_set_pos(bg, 0, 0);
+  lv_img_set_src(bg, &glow);
+  lv_obj_set_pos(bg, 0, 80);
   _pages[1] = bg;
   lv_obj_add_flag(_pages[1], LV_OBJ_FLAG_HIDDEN);
+
+  lv_obj_t* lbl_total = lv_label_create(bg);
+  lv_label_set_text(lbl_total, "0");
+  lv_obj_add_style(lbl_total, &style_white_font_42, 0);
+  lv_obj_set_width(lbl_total, 172);
+  lv_obj_set_style_text_align(lbl_total, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_pos(lbl_total, 0, 52);
+  
+  lv_obj_t* lbl_w = lv_label_create(bg);
+  lv_label_set_text(lbl_w, "W");
+  lv_obj_add_style(lbl_w, &style_white_font_20, 0);
+  lv_obj_set_width(lbl_w, 172);
+  lv_obj_set_style_text_align(lbl_w, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_pos(lbl_w, 0, 100);
+
+  page1_lbl_total = lbl_total;
 }
 
 static void
@@ -116,53 +148,47 @@ my_lvgl_app_init_page0(void)
 #define LABEL_NUM_WIDTH     70
 
   lv_obj_t * bg = lv_img_create(lv_scr_act());
-  lv_img_set_src(bg, &page1_ui);
+  lv_img_set_src(bg, &page0_ui);
   lv_obj_set_pos(bg, 0, 0);
-
-  /* Create a style for white text */
-  static lv_style_t style_white;
-  lv_style_init(&style_white);
-  lv_style_set_text_color(&style_white, lv_color_white());
-  lv_style_set_text_font(&style_white, &lv_font_montserrat_20);
 
   lv_obj_t* lbl_c1 = lv_label_create(bg);
   lv_label_set_text(lbl_c1, "0 W");
-  lv_obj_add_style(lbl_c1, &style_white, 0);
+  lv_obj_add_style(lbl_c1, &style_white_font_20, 0);
   lv_obj_set_width(lbl_c1, LABEL_NUM_WIDTH);
   lv_obj_set_style_text_align(lbl_c1, LV_TEXT_ALIGN_RIGHT, 0);
   lv_obj_set_pos(lbl_c1, 5, 67);
 
   lv_obj_t* lbl_c2 = lv_label_create(bg);
   lv_label_set_text(lbl_c2, "0 W");
-  lv_obj_add_style(lbl_c2, &style_white, 0);
+  lv_obj_add_style(lbl_c2, &style_white_font_20, 0);
   lv_obj_set_width(lbl_c2, LABEL_NUM_WIDTH);
   lv_obj_set_style_text_align(lbl_c2, LV_TEXT_ALIGN_RIGHT, 0);
   lv_obj_set_pos(lbl_c2, 91, 67);
 
   lv_obj_t* lbl_c3 = lv_label_create(bg);
   lv_label_set_text(lbl_c3, "0 W");
-  lv_obj_add_style(lbl_c3, &style_white, 0);
+  lv_obj_add_style(lbl_c3, &style_white_font_20, 0);
   lv_obj_set_width(lbl_c3, LABEL_NUM_WIDTH);
   lv_obj_set_style_text_align(lbl_c3, LV_TEXT_ALIGN_RIGHT, 0);
   lv_obj_set_pos(lbl_c3, 5, 162);
 
   lv_obj_t* lbl_c4 = lv_label_create(bg);
   lv_label_set_text(lbl_c4, "0 W");
-  lv_obj_add_style(lbl_c4, &style_white, 0);
+  lv_obj_add_style(lbl_c4, &style_white_font_20, 0);
   lv_obj_set_width(lbl_c4, LABEL_NUM_WIDTH);
   lv_obj_set_style_text_align(lbl_c4, LV_TEXT_ALIGN_RIGHT, 0);
   lv_obj_set_pos(lbl_c4, 91, 162);
 
   lv_obj_t* lbl_a1 = lv_label_create(bg);
   lv_label_set_text(lbl_a1, "0 W");
-  lv_obj_add_style(lbl_a1, &style_white, 0);
+  lv_obj_add_style(lbl_a1, &style_white_font_20, 0);
   lv_obj_set_width(lbl_a1, LABEL_NUM_WIDTH);
   lv_obj_set_style_text_align(lbl_a1, LV_TEXT_ALIGN_RIGHT, 0);
   lv_obj_set_pos(lbl_a1, 5, 256);
 
   lv_obj_t* lbl_a2 = lv_label_create(bg);
   lv_label_set_text(lbl_a2, "0 W");
-  lv_obj_add_style(lbl_a2, &style_white, 0);
+  lv_obj_add_style(lbl_a2, &style_white_font_20, 0);
   lv_obj_set_width(lbl_a2, LABEL_NUM_WIDTH);
   lv_obj_set_style_text_align(lbl_a2, LV_TEXT_ALIGN_RIGHT, 0);
   lv_obj_set_pos(lbl_a2, 91, 256);
@@ -192,6 +218,14 @@ void
 my_lvgl_app_init(void)
 {
   lvgl_port_lock(0);
+
+  lv_style_init(&style_white_font_20);
+  lv_style_set_text_color(&style_white_font_20, lv_color_white());
+  lv_style_set_text_font(&style_white_font_20, &lv_font_montserrat_20);
+
+  lv_style_init(&style_white_font_42);
+  lv_style_set_text_color(&style_white_font_42, lv_color_white());
+  lv_style_set_text_font(&style_white_font_42, &lv_font_montserrat_42);
 
   my_lvgl_app_init_page0();
   my_lvgl_app_init_page1();
