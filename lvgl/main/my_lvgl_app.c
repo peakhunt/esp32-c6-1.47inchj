@@ -16,6 +16,8 @@
 #include "esp_idf_version.h"
 #include "esp_system.h"
 #include "esp_app_desc.h"
+#include "driver/temperature_sensor.h"
+#include "esp_heap_caps.h"
 
 #define NUM_ELEM(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -56,11 +58,11 @@ struct my_lvgl_app_page
       lv_obj_t* arc_power;
       lv_obj_t* arc_temp;
       lv_obj_t* arc_cpu;
-      lv_obj_t* arc_heap;
+      lv_obj_t* arc_mem;
       lv_obj_t* lbl_power;
       lv_obj_t* lbl_temp;
       lv_obj_t* lbl_cpu;
-      lv_obj_t* lbl_heap;
+      lv_obj_t* lbl_mem;
     } p2;
   };
 };
@@ -79,6 +81,13 @@ static void my_lvgl_app_page2_deactivate(my_lvgl_app_page_t* page);
 
 static lv_style_t style_white_font_20;
 static lv_style_t style_white_font_42;
+
+static temperature_sensor_handle_t temp_handle = NULL;
+
+//
+// XXX don't forget that this is just an estimate for physical SRAM usage
+//
+extern size_t total_sram_in_KB;
 
 const char*
 chip_model_str(esp_chip_model_t model)
@@ -365,6 +374,8 @@ my_lvgl_app_page2_init(my_lvgl_app_page_t* page)
   // Power Consumption (top-left)
   lv_obj_t * arc_power = lv_arc_create(top);
   lv_obj_set_size(arc_power, 80, 80);
+  lv_arc_set_range(arc_power, 0, 840);
+  lv_arc_set_value(arc_power, 0);
   lv_obj_set_grid_cell(arc_power,
       LV_GRID_ALIGN_CENTER, 0, 1,
       LV_GRID_ALIGN_CENTER, 0, 1);
@@ -372,13 +383,15 @@ my_lvgl_app_page2_init(my_lvgl_app_page_t* page)
   lv_obj_set_style_arc_width(arc_power, 7, LV_PART_MAIN);
 
   lv_obj_t * lbl_power = lv_label_create(arc_power);
-  lv_label_set_text(lbl_power, "200W");
+  lv_label_set_text(lbl_power, "0W");
   lv_obj_add_style(lbl_power, &style_white_font_20, 0);
   lv_obj_center(lbl_power);
 
   // CPU Temperature (top-right)
   lv_obj_t * arc_temp = lv_arc_create(top);
   lv_obj_set_size(arc_temp, 80, 80);
+  lv_arc_set_range(arc_temp, 0, 80);
+  lv_arc_set_value(arc_temp, 0);
   lv_obj_set_grid_cell(arc_temp,
       LV_GRID_ALIGN_CENTER, 1, 1,
       LV_GRID_ALIGN_CENTER, 0, 1);
@@ -393,6 +406,8 @@ my_lvgl_app_page2_init(my_lvgl_app_page_t* page)
   // CPU Usage (bottom-left)
   lv_obj_t * arc_cpu = lv_arc_create(top);
   lv_obj_set_size(arc_cpu, 80, 80);
+  lv_arc_set_range(arc_cpu, 0, 100);
+  lv_arc_set_value(arc_cpu, 0);
   lv_obj_set_grid_cell(arc_cpu,
       LV_GRID_ALIGN_CENTER, 0, 1,
       LV_GRID_ALIGN_CENTER, 1, 1);
@@ -400,23 +415,25 @@ my_lvgl_app_page2_init(my_lvgl_app_page_t* page)
   lv_obj_set_style_arc_width(arc_cpu, 8, LV_PART_MAIN);
 
   lv_obj_t * lbl_cpu = lv_label_create(arc_cpu);
-  lv_label_set_text(lbl_cpu, "100%");
+  lv_label_set_text(lbl_cpu, "0%");
   lv_obj_add_style(lbl_cpu, &style_white_font_20, 0);
   lv_obj_center(lbl_cpu);
 
   // Heap Memory (bottom-right)
-  lv_obj_t * arc_heap = lv_arc_create(top);
-  lv_obj_set_size(arc_heap, 80, 80);
-  lv_obj_set_grid_cell(arc_heap,
+  lv_obj_t * arc_mem = lv_arc_create(top);
+  lv_obj_set_size(arc_mem, 80, 80);
+  lv_arc_set_range(arc_mem, 0, total_sram_in_KB);
+  lv_arc_set_value(arc_mem, 0);
+  lv_obj_set_grid_cell(arc_mem,
       LV_GRID_ALIGN_CENTER, 1, 1,
       LV_GRID_ALIGN_CENTER, 1, 1);
-  lv_obj_set_style_arc_width(arc_heap, 7, LV_PART_INDICATOR);
-  lv_obj_set_style_arc_width(arc_heap, 7, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(arc_mem, 7, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_width(arc_mem, 7, LV_PART_MAIN);
 
-  lv_obj_t * lbl_heap = lv_label_create(arc_heap);
-  lv_label_set_text(lbl_heap, "112KB");
-  lv_obj_add_style(lbl_heap, &style_white_font_20, 0);
-  lv_obj_center(lbl_heap);
+  lv_obj_t * lbl_mem = lv_label_create(arc_mem);
+  lv_label_set_text(lbl_mem, "0KB");
+  lv_obj_add_style(lbl_mem, &style_white_font_20, 0);
+  lv_obj_center(lbl_mem);
 
   // System Information row (covers both columns)
   lv_obj_t * sys_info = lv_obj_create(top);
@@ -447,11 +464,11 @@ my_lvgl_app_page2_init(my_lvgl_app_page_t* page)
   page->p2.arc_power = arc_power;
   page->p2.arc_temp = arc_temp;
   page->p2.arc_cpu = arc_cpu;
-  page->p2.arc_heap = arc_heap;
+  page->p2.arc_mem = arc_mem;
   page->p2.lbl_power = lbl_power;
   page->p2.lbl_temp = lbl_temp;
   page->p2.lbl_cpu = lbl_cpu;
-  page->p2.lbl_heap = lbl_heap;
+  page->p2.lbl_mem = lbl_mem;
 }
 
 static void
@@ -482,6 +499,23 @@ my_lvgl_app_show_page(uint8_t page)
   lvgl_port_unlock();
 }
 
+static int
+get_cpu_usage(void)
+{
+  char stats_buf[512];
+  vTaskGetRunTimeStats(stats_buf);
+
+  // Find "IDLE" line
+  char *idle_line = strstr(stats_buf, "IDLE");
+  if (!idle_line) return -1;
+
+  // Extract percentage after IDLE
+  int idle_percent = 0;
+  sscanf(idle_line, "IDLE %*d %d%%", &idle_percent);
+
+  return 100 - idle_percent;
+}
+
 //
 // XXX
 // this is called from LVGL task context
@@ -489,7 +523,6 @@ my_lvgl_app_show_page(uint8_t page)
 static void
 watt_simulator_cb(lv_timer_t * timer)
 {
-  lvgl_port_lock(0);
 
   char buf[16];
 
@@ -500,6 +533,13 @@ watt_simulator_cb(lv_timer_t * timer)
   int w5 = rand() % 141;
   int w6 = rand() % 141;
   int total = w1 + w2 + w3 + w4 + w5 + w6;
+  float tsens_out = 0;
+
+  ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_handle, &tsens_out));
+
+  size_t used_sram = total_sram_in_KB - (esp_get_free_internal_heap_size()/1024);
+
+  lvgl_port_lock(0);
 
   sprintf(buf, "%d W", w1);
   lv_label_set_text(app_pages[0].p0.lbl_c1, buf);
@@ -522,6 +562,21 @@ watt_simulator_cb(lv_timer_t * timer)
   sprintf(buf, "%d", total);
   lv_label_set_text(app_pages[1].p1.lbl_total, buf);
 
+  lv_arc_set_value(app_pages[2].p2.arc_power, total);
+  lv_label_set_text_fmt(app_pages[2].p2.lbl_power,  "%dW", total);
+
+  int cpu_usage = get_cpu_usage();
+
+  lv_arc_set_value(app_pages[2].p2.arc_cpu, cpu_usage);
+  lv_label_set_text_fmt(app_pages[2].p2.lbl_cpu,  "%d%%", cpu_usage);
+
+  lv_arc_set_value(app_pages[2].p2.arc_temp, (int)tsens_out);
+  snprintf(buf, 16, "%.1f°C", tsens_out);
+  lv_label_set_text(app_pages[2].p2.lbl_temp, buf);
+
+  lv_arc_set_value(app_pages[2].p2.arc_mem, used_sram);
+  lv_label_set_text_fmt(app_pages[2].p2.lbl_mem,  "%dKB", used_sram);
+
   lvgl_port_unlock();
 }
 
@@ -538,6 +593,11 @@ my_lvgl_app_user_btn_pressed(void)
 void
 my_lvgl_app_init(void)
 {
+  // configure temperature sensor
+  temperature_sensor_config_t temp_sensor = TEMPERATURE_SENSOR_CONFIG_DEFAULT(0, 80);
+  ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor, &temp_handle));
+  ESP_ERROR_CHECK(temperature_sensor_enable(temp_handle));
+
   lvgl_port_lock(0);
 
   lv_obj_t * scr = lv_scr_act();  // get the active screen

@@ -34,6 +34,8 @@ static uint32_t t = 0;  // time counter
 
 static QueueHandle_t gpio_evt_queue = NULL;
 
+size_t total_sram_in_KB = 0;
+
 static void
 change_led(void)
 {
@@ -108,6 +110,9 @@ configure_gpio_input(void)
 void
 app_main(void)
 {
+  total_sram_in_KB = esp_get_free_internal_heap_size() / 1024;
+  ESP_LOGI(TAG, "Free heap %dKB", total_sram_in_KB);
+
   uint32_t  io_num;
   bool      key_pressed = false;
   uint32_t  io_val;
@@ -122,6 +127,8 @@ app_main(void)
   //app_main_display();
   my_lvgl_app_init();
 
+  ESP_LOGI(TAG, "Free heap after init %dKB", esp_get_free_internal_heap_size() / 1024);
+
   while (1)
   {
     if (xQueueReceive(gpio_evt_queue, &io_num, CONFIG_BLINK_PERIOD / portTICK_PERIOD_MS))
@@ -129,14 +136,12 @@ app_main(void)
       io_val = gpio_get_level(io_num);
       if (key_pressed == false && io_val == 0)
       {
-        ESP_LOGI(TAG, "key pressed...");
         key_pressed = true;
         my_lvgl_app_user_btn_pressed();
       }
       else if(key_pressed == true && io_val == 1)
       {
         key_pressed = false;
-        ESP_LOGI(TAG, "key released...");
       }
     }
     change_led();

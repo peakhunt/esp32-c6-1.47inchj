@@ -6,7 +6,7 @@ set(srcs "app_main.c"
 set(includes ".")
 
 idf_component_register(SRCS ${srcs}
-                       REQUIRES esp_app_format esp_lcd esp_driver_spi
+                       REQUIRES esp_app_format esp_lcd esp_driver_spi esp_driver_tsens
                        INCLUDE_DIRS ${includes})
 
 lvgl_port_create_c_image("images/page0_ui.png" "images/" "ARGB8888" "NONE")
