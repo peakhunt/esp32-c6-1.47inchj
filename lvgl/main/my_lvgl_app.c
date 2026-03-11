@@ -252,8 +252,12 @@ my_lvgl_app_page1_thunder_sprite_cb(void* var, int32_t frame)
 static void
 my_lvgl_app_page1_power_anim_cb(void* var, int32_t v)
 {
+  lvgl_port_lock(0);
+
   lv_obj_t * obj = (lv_obj_t *)var;
   lv_obj_set_style_opa(obj, v, 0);
+
+  lvgl_port_unlock();
 }
 
 static void
