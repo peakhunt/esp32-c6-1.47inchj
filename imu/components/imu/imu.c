@@ -143,9 +143,16 @@ imu_calc_sensor_value(imu_t* imu)
   imu->data.accel[1] = imu->adjusted.accel[1] * imu->lsb.accel_lsb;
   imu->data.accel[2] = imu->adjusted.accel[2] * imu->lsb.accel_lsb;
 
+#if 0 // Mahony/Madgwick AHRS converts degree to radian internally
   imu->data.gyro[0] = imu->adjusted.gyro[0] * imu->lsb.gyro_lsb * (M_PI / 180.0f);  // to radians
   imu->data.gyro[1] = imu->adjusted.gyro[1] * imu->lsb.gyro_lsb * (M_PI / 180.0f);
   imu->data.gyro[2] = imu->adjusted.gyro[2] * imu->lsb.gyro_lsb * (M_PI / 180.0f);
+#else
+  imu->data.gyro[0] = imu->adjusted.gyro[0] * imu->lsb.gyro_lsb;  // to radians
+  imu->data.gyro[1] = imu->adjusted.gyro[1] * imu->lsb.gyro_lsb;
+  imu->data.gyro[2] = imu->adjusted.gyro[2] * imu->lsb.gyro_lsb;
+#endif
+
 
   imu->data.mag[0] = imu->adjusted.mag[0] * imu->lsb.mag_lsb;
   imu->data.mag[1] = imu->adjusted.mag[1] * imu->lsb.mag_lsb;
