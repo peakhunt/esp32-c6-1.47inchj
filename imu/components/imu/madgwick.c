@@ -214,6 +214,13 @@ madgwick_get_roll_pitch_yaw(madgwick_t* madgwick, float data[3], float md)
   // Quaternion doesn't care about AXIS convention or Right hand rule!
   // As long as we feed sensor data(accel/gyro/mag) in a coherent
   // convention, the quaternion math should just work fine.
+  // 
+  // But Madgwick/Mahoy isn't just pure quaterion. It expects
+  // sensor inputs in a certain convention. And the implemention
+  // in this source expects it to be NED right handle rule. It's because
+  // the algorithms rely on reference vector in the global world. And
+  // the reference vector is hidden in the cryptic quaternion math in the
+  // code.
   //
   // So we are feeding sensor data in NED right hand rule convention.
   // Accel/Gyro/Mag data are all aligned in that fashion before entering AHRS
@@ -225,7 +232,6 @@ madgwick_get_roll_pitch_yaw(madgwick_t* madgwick, float data[3], float md)
   // If you use a different convention like ENU or whatver,
   // the equation should be changed.
   //
-  // Fucking math!
   //
   float roll, pitch, yaw;
 
