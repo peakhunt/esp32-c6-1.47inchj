@@ -2,24 +2,6 @@
 #include "mahony.h"
 #include "math_helper.h"
 
-//
-//
-// Mahony/Madgwick algirhtm uses NED convention
-//
-// X : North. Positive Forward
-// Y : East. Positive Right
-// Z : Down. Positive Downward
-//
-// Rotation Angle ( No specification in AXIS convention.
-// The quaternion‑to‑Euler math applies the right‑hand rule to those axes)
-//
-// Pitch: Rotation about Y axis. Positive pitch corresponds to nose up
-// Roll: rotation about X axis. Positive roll = right wing down
-// Yaw : rotation about Z. Positive yaw = nose turns to the right (clockwise)
-//
-// XXX
-//
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // private definitions
