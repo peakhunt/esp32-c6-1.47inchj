@@ -142,12 +142,13 @@ mpu9250_init(mpu9250_t* mpu9250,
 
   uint8_t temp;
 
-  // read who am I
-  temp = mpu9250_read_reg(0x75);
-  ESP_LOGI(TAG, "MPU9250 who am I: %x", temp);
 
   /* Wakeup MPU6050 */
   mpu9250_write_reg(MPU9250_PWR_MGMT_1, 0x00);
+
+  // read who am I
+  temp = mpu9250_read_reg(0x75);
+  ESP_LOGI(TAG, "MPU9250 who am I: %x", temp);
 
   /* Config accelerometer */
   temp = mpu9250_read_reg(MPU9250_ACCEL_CONFIG);
