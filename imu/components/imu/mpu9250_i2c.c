@@ -15,9 +15,107 @@ static i2c_master_bus_handle_t i2c_bus;
 static i2c_master_dev_handle_t mpu9250_dev;
 static i2c_master_dev_handle_t ak8963_dev;
 
+#if 0
+static void
+mpu9250_nuclear_recovery(void) {
+  // 1. Set all to Input/Output Open-Drain to "listen" to the bus
+  gpio_config_t ncs_conf = {
+    .pin_bit_mask = (1ULL << MPU9250_I2C_MASTER_NCS_IO),
+    .mode = GPIO_MODE_OUTPUT,
+    .pull_up_en = GPIO_PULLUP_DISABLE,
+    .pull_down_en = GPIO_PULLUP_DISABLE,
+  };
+  gpio_config(&ncs_conf);
+
+  gpio_config_t bus_conf = {
+    .pin_bit_mask = (1ULL << MPU9250_I2C_MASTER_SDA_IO) | (1ULL << MPU9250_I2C_MASTER_SCL_IO),
+    .mode = GPIO_MODE_INPUT, // Input only - no driving!
+    .pull_up_en = GPIO_PULLUP_ENABLE, // Use internal as backup to your 10k
+  };
+  gpio_config(&bus_conf);
+
+  int count = 0;
+  // 2. Adaptive Loop
+  while(true)
+  {
+    int sda = gpio_get_level(MPU9250_I2C_MASTER_SDA_IO);
+    int scl = gpio_get_level(MPU9250_I2C_MASTER_SCL_IO);
+
+    if (sda == 1 && scl == 1) {
+      ESP_LOGI(TAG, "SUCCESS: Bus cleared after %d loops", count);
+      break;
+    }
+
+    // Only log every 100ms so we don't flood the serial buffer
+    if (count % 5 == 0) {
+      ESP_LOGW(TAG, "WAITING: SDA=%d, SCL=%d (Iteration %d)", sda, scl, count);
+    }
+
+    // Hammer: Flip to SPI mode and back
+    gpio_set_level(MPU9250_I2C_MASTER_NCS_IO, 0); 
+    esp_rom_delay_us(2000); // 2ms "latch" time
+    gpio_set_level(MPU9250_I2C_MASTER_NCS_IO, 1);
+    esp_rom_delay_us(2000);
+  }
+
+  // 3. Final Handover
+  gpio_set_level(MPU9250_I2C_MASTER_NCS_IO, 1); // Ensure nCS stays High for I2C
+}
+#else
+static void
+mpu9250_nuclear_recovery(void)
+{
+  //
+  // sometimes during CPU reset (not Power Recycle)
+  // with 500 sampling at 400Khz I2C clock,
+  // when CPU gets reset (not power recycle)
+  // two problems were found
+  // 1. SDA line gets stuck low
+  // 2. MPU9250 internal I2C handling logic gets stuck.
+  // Somehow, through black box level trial and error,
+  // This is the solution that was found.
+  // If you ask why, no clear answers can be given to you.
+  // 
+  // Another solution is, at first I2C transaction failure after reset,
+  // if we retry, it seems to be working fine at that too.
+  //
+  // both logics are implemented here and mpu9250.c
+  // 
+  gpio_config_t ncs_conf = {
+    .pin_bit_mask = (1ULL << MPU9250_I2C_MASTER_NCS_IO),
+    .mode = GPIO_MODE_OUTPUT,
+    .pull_up_en = GPIO_PULLUP_DISABLE,
+    .pull_down_en = GPIO_PULLUP_DISABLE,
+  };
+  gpio_config(&ncs_conf);
+
+  gpio_config_t bus_conf = {
+    .pin_bit_mask = (1ULL << MPU9250_I2C_MASTER_SDA_IO) | (1ULL << MPU9250_I2C_MASTER_SCL_IO),
+    .mode = GPIO_MODE_INPUT, // Input only - no driving!
+    .pull_up_en = GPIO_PULLUP_ENABLE, // Use internal as backup to your 10k
+  };
+  gpio_config(&bus_conf);
+
+  int sda = gpio_get_level(MPU9250_I2C_MASTER_SDA_IO);
+  int scl = gpio_get_level(MPU9250_I2C_MASTER_SCL_IO);
+
+  ESP_LOGI(TAG, "Bus State: SCL %d, SDA %d", scl, sda);
+
+  // Hammer: Flip to SPI mode and back
+  gpio_set_level(MPU9250_I2C_MASTER_NCS_IO, 0); 
+  esp_rom_delay_us(2000); // 2ms "latch" time
+  gpio_set_level(MPU9250_I2C_MASTER_NCS_IO, 1);
+  esp_rom_delay_us(2000);
+}
+#endif
+
 void
 mpu9250_i2c_init(void)
 {
+  ESP_LOGI(TAG, "Trying to Recover");
+  mpu9250_nuclear_recovery();
+  ESP_LOGI(TAG, "Trying to Recover Complete");
+
   i2c_master_bus_config_t bus_config = {
     .clk_source = I2C_CLK_SRC_DEFAULT,
     .i2c_port = MPU9250_I2C_NUM,
@@ -32,9 +130,6 @@ mpu9250_i2c_init(void)
   {
     ESP_LOGE(TAG, "Failed to create I2C bus: %s", esp_err_to_name(ret));
   }
-
-  // If bus is stuck, try a hardware-level reset of the I2C peripheral
-  i2c_master_bus_reset(i2c_bus); 
 
   i2c_device_config_t dev_cfg =
   {

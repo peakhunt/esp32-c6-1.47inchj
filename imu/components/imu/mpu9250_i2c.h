@@ -7,6 +7,7 @@
 #define MPU9250_I2C_NUM                 I2C_NUM_0
 #define MPU9250_I2C_MASTER_SDA_IO       19
 #define MPU9250_I2C_MASTER_SCL_IO       18
+#define MPU9250_I2C_MASTER_NCS_IO       20
 #define MPU9250_I2C_CLK_FREQ            400000
 
 extern void mpu9250_i2c_init(void);
