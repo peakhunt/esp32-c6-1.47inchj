@@ -142,9 +142,25 @@ mpu9250_init(mpu9250_t* mpu9250,
 
   uint8_t temp;
 
-
   /* Wakeup MPU6050 */
-  mpu9250_write_reg(MPU9250_PWR_MGMT_1, 0x00);
+  // if cpu resets in the middle of MPU9250 transaction
+  // we might have i2c failure at the first write
+  // due to stuck SDA line
+  uint8_t data = 0x00;
+
+  if(mpu9250_i2c_write(MPU9250_PWR_MGMT_1, &data, 1) == false)
+  {
+    while(true)
+    {
+      ESP_LOGE(TAG, "First transaction failed. Retrying...");
+
+      if(mpu9250_i2c_write(MPU9250_PWR_MGMT_1, &data, 1) == true)
+      {
+        ESP_LOGI(TAG, "Retried init transaction success!");
+        break;
+      }
+    }
+  }
 
   // read who am I
   temp = mpu9250_read_reg(0x75);
