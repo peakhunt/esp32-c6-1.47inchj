@@ -24,7 +24,7 @@ mpu9250_i2c_init(void)
     .sda_io_num = MPU9250_I2C_MASTER_SDA_IO,
     .scl_io_num = MPU9250_I2C_MASTER_SCL_IO,
     .glitch_ignore_cnt = 7,
-    .flags.enable_internal_pullup = true,
+    .flags.enable_internal_pullup = false,   // already pulled up on the chinese mpu9255 breakout board
   };
 
   esp_err_t ret = i2c_new_master_bus(&bus_config, &i2c_bus);
@@ -32,6 +32,9 @@ mpu9250_i2c_init(void)
   {
     ESP_LOGE(TAG, "Failed to create I2C bus: %s", esp_err_to_name(ret));
   }
+
+  // If bus is stuck, try a hardware-level reset of the I2C peripheral
+  i2c_master_bus_reset(i2c_bus); 
 
   i2c_device_config_t dev_cfg =
   {
