@@ -13,11 +13,15 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "led_strip.h"
+#include "nvs_flash.h"
 #include "sdkconfig.h"
 #include "imu_task.h"
 #include "st7789_lcd.h"
 #include "lvgl_port_intf.h"
 #include "my_lvgl_app.h"
+#include "wifi.h"
+#include "mount.h"
+#include "web_server.h"
 
 #define GPIO_INPUT_IO_9     9
 #define GPIO_INPUT_PIN_SEL  ((1ULL<<GPIO_INPUT_IO_9))
@@ -216,6 +220,13 @@ app_main(void)
   total_sram_in_KB = esp_get_free_internal_heap_size() / 1024;
   ESP_LOGI(TAG, "Free heap %dKB", total_sram_in_KB);
 
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
+
   uint32_t  io_num;
   bool      key_pressed = false;
   uint32_t  io_val;
@@ -232,6 +243,10 @@ app_main(void)
 
   ESP_LOGI(TAG, "Free heap after init %dKB", esp_get_free_internal_heap_size() / 1024);
   xTaskCreatePinnedToCore(stats_task, "stats", 4096, NULL, 3, NULL, tskNO_AFFINITY);
+
+  wifi_init();
+  mount_storage("/spiffs");
+  web_server_init();
 
   while (1)
   {

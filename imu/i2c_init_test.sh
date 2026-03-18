@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PORT="/dev/ttyACM0"
-DURATION="5s"
+DURATION="3s"
 ERROR_MSG="mpu9250: First transaction failed. Retrying.."
 MAX_ALLOWED=10
 LOG_FILE="stress_test_session.txt"
