@@ -458,6 +458,24 @@ ws_imu_handler(httpd_req_t *req)
   {
     // This is the handshake; return ESP_OK to switch protocols
     ESP_LOGI("WS", "Handshake done, client connected");
+
+    /*
+     if it takes a long time even after setting short keep-alive
+     during http server initialization.
+
+     #include <lwip/sockets.h>
+
+     int keep_idle = 5;    // 5s idle
+     int keep_intvl = 2;   // 2s interval
+     int keep_cnt = 3;     // 3 fails
+     int keep_alive = 1;   // Enable
+
+     setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keep_alive, sizeof(int));
+     setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keep_idle, sizeof(int));
+     setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keep_intvl, sizeof(int));
+     setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keep_cnt, sizeof(int));
+     */
+      
     return ESP_OK;
   }
 
@@ -509,8 +527,16 @@ ws_broadcast_imu_update(imu_telemetry_pkt_t* pkt)
           .type = HTTPD_WS_TYPE_BINARY,
           .final = true
         };
-        // Use async send to avoid blocking your IMU filter task
-        httpd_ws_send_frame_async(_server, fds[i], &packet);
+        esp_err_t ret = httpd_ws_send_frame_async(_server, fds[i], &packet);
+        
+        if (ret != ESP_OK)
+        {
+            // The socket is dead or the buffer is a disaster.
+            // HARDCORE MOVE: Kill the socket manually.
+            // This stops the 'Error 11' logs immediately.
+            ESP_LOGW(TAG, "Killing Ghost Client FD: %d", fds[i]);
+            httpd_sess_trigger_close(_server, fds[i]); 
+        }
       }
     }
   }
@@ -537,6 +563,11 @@ web_server_init(void)
   strlcpy(server_data->base_path, "/spiffs", sizeof(server_data->base_path));
 
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+  config.keep_alive_enable = true;
+  config.keep_alive_idle = 5;       // How long to wait of total silence before probing (Seconds)
+  config.keep_alive_interval = 2;   // Interval between individual probes (Seconds)
+  config.keep_alive_count = 3;      // How many failed probes before killing the socket
 
   config.max_uri_handlers = 32;
   config.max_open_sockets = 20;
