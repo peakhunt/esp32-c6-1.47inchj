@@ -118,15 +118,10 @@ typedef enum
 
 typedef struct
 {
-  float accel_lsb;
-  float gyro_lsb;
-  float mag_lsb;
-} mpu9250_lsb_config_t;
-
-typedef struct
-{
   MPU9250_Accelerometer_t   accel_config;
   MPU9250_Gyroscope_t       gyro_config;
+  uint64_t                  num_transactions;
+  uint64_t                  num_failed;
 } mpu9250_t;
 
 extern void mpu9250_init(mpu9250_t* mpu9250,
