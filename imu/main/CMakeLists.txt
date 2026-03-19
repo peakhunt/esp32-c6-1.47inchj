@@ -17,12 +17,11 @@ idf_component_register(SRCS ${srcs}
                                     spiffs fatfs
                        INCLUDE_DIRS ${includes})
 
+# Define the source directory clearly
+set(WEB_DIST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../web-front/dist")
 
-set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../web-front")
-file(GLOB_RECURSE WEB_FILES "${WEB_SRC_DIR}/dist/*")
-
-if(EXISTS ${WEB_SRC_DIR}/dist)
-  spiffs_create_partition_image(storage ${WEB_SRC_DIR}/dist FLASH_IN_PROJECT)
-else()
-  message(FATAL_ERROR "${WEB_SRC_DIR}/dist doesn't exit. Please run 'npm run build' in ${WEB_SRC_DIR}")
-endif()
+# Force the SPIFFS image to wait for the npm build target
+# We remove the 'if(EXISTS)' because 'web_ui_build' will CREATE it
+spiffs_create_partition_image(storage ${WEB_DIST_DIR} 
+                              FLASH_IN_PROJECT 
+                              DEPENDS web_ui_build)
