@@ -1,211 +1,188 @@
 <template>
-  <section class="section has-background-light" style="min-height: 100vh;">
+  <section class="section has-background-light p-3" style="min-height: 100vh;">
+    
+    <!-- SIDEBAR MENU OVERLAY -->
+    <div :class="['sidebar-menu', { 'is-active': showMenu }]">
+      <div class="p-5">
+        <div class="is-flex is-justify-content-space-between mb-5">
+          <p class="title is-5 has-text-white mb-0">MENU</p>
+          <button class="delete is-medium" @click="showMenu = false"></button>
+        </div>
+        <aside class="menu">
+          <ul class="menu-list">
+            <li><a class="has-text-white" @click="setView('dashboard')">Dashboard</a></li>
+            <li><a class="has-text-white" @click="setView('calibration')">IMU Calibration</a></li>
+          </ul>
+        </aside>
+      </div>
+    </div>
+
+    <!-- SIDEBAR MASK -->
+    <div v-if="showMenu" class="sidebar-mask" @click="showMenu = false"></div>
+
     <div class="container">
+      <!-- HEADER ROW: FIXED 3-COLUMN BOX -->
+      <div class="is-flex is-align-items-center mb-5" style="min-height: 3.5rem;">
+        
+        <!-- LEFT: Fixed width for icon (Ensures clickability) -->
+        <div style="width: 48px; flex-shrink: 0; z-index: 10;">
+          <a @click.stop="showMenu = true" class="has-text-black is-flex is-align-items-center" style="cursor: pointer;">
+            <Icon icon="mdi:menu" width="32" height="32" />
+          </a>
+        </div>
+
+        <!-- CENTER: Title restricted to middle space -->
+        <div style="flex-grow: 1; text-align: center; overflow: hidden;">
+          <h1 class="title is-size-4-mobile is-size-3-tablet has-text-black has-text-weight-black m-0" style="white-space: nowrap;">
+            {{ currentView === 'dashboard' ? 'IMU Status' : 'Calibration' }}
+          </h1>
+        </div>
+
+        <!-- RIGHT: Invisible spacer to balance the icon -->
+        <div style="width: 48px; flex-shrink: 0;"></div>
+      </div>
+
+      <!-- VIEW SWITCHER -->
+      <DashboardView v-show="currentView === 'dashboard'" ref="dashboardRef" />
+      <CalibrationView v-show="currentView === 'calibration'" ref="calibrationRef"/>
       
-      <div class="mb-6">
-        <h1 class="title has-text-centered is-size-3 has-text-black has-text-weight-black">IMU Status</h1>
-      </div>
-
-      <!-- Main Stats Container -->
-      <div class="columns is-mobile is-multiline mb-5 has-background-white shadow-card p-4">
-
-        <!-- STATUS: Half width on mobile, Auto on desktop -->
-        <div class="column is-6-mobile has-text-centered">
-          <p class="heading">STATUS</p>
-          <div :class="['status-indicator', state.stats.connected ? 'is-live' : 'is-off']">
-            <span class="tag is-rounded has-text-weight-bold">
-              {{ state.stats.connected ? 'LIVE' : 'OFFLINE' }}
-            </span>
-          </div>
-        </div>
-
-        <!-- CPU: Half width on mobile -->
-        <div class="column is-6-mobile has-text-centered">
-          <p class="heading">CPU</p>
-          <p class="title is-5 has-text-black">{{ state.cpuUsage }}%</p>
-        </div>
-
-        <!-- LOOP: Half width on mobile -->
-        <div class="column is-6-mobile has-text-centered">
-          <p class="heading">LOOP</p>
-          <p class="title is-5 has-text-black">{{ state.samplingRate }}Hz</p>
-        </div>
-
-        <!-- I2C TX: Half width on mobile -->
-        <div class="column is-6-mobile has-text-centered">
-          <p class="heading">I2C TX</p>
-          <p class="title is-5 has-text-black">{{ state.i2cTransactions.toLocaleString() }}</p>
-        </div>
-
-        <!-- I2C FAIL: Full width on mobile to emphasize errors -->
-        <div class="column is-12-mobile has-text-centered">
-          <p class="heading">I2C FAIL</p>
-          <p class="title is-5" :class="state.i2cFailed > 0 ? 'has-text-danger' : 'has-text-grey-light'">
-          {{ state.i2cFailed }}
-          </p>
-        </div>
-      </div>
-
-      <!-- GAUGES SECTION -->
-      <div class="columns is-multiline is-variable is-2">
-        <div class="column is-4-desktop is-12-mobile" v-for="type in ['ROLL', 'PITCH', 'YAW']" :key="type">
-          <div class="card has-background-white has-text-centered shadow-card">
-            <div class="card-content px-2 py-5">
-              <p class="heading has-text-weight-bold has-text-black mb-4">{{ type }}</p>
-              <component :is="getGauge(type)" :[type.toLowerCase()]="state[type.toLowerCase()]" />
-              <p class="title is-2 has-text-black">{{ state[type.toLowerCase()].toFixed(type === 'YAW' ? 0 : 1) }}°</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- TELEMETRY CHART -->
-      <div class="column is-12 mt-5 p-0">
-        <div class="card has-background-white shadow-card">
-          <div class="card-content">
-            <p class="heading has-text-weight-bold has-text-black mb-4">REAL-TIME TELEMETRY</p>
-            <div ref="chartRef" class="uplot-wrapper"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 3D ATTITUDE VIEW -->
-      <div class="column is-12 mt-5 p-0">
-        <div class="card has-background-white shadow-card">
-          <div class="card-content">
-            <Attitude3D :roll="state.roll" :pitch="state.pitch" :yaw="state.yaw" />
-          </div>
-        </div>
-      </div>
-
     </div>
   </section>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { Icon } from '@iconify/vue'
 import { useIMUStore } from './store/imuStore'
-import uPlot from 'uplot'
-import 'uplot/dist/uPlot.min.css'
-import Attitude3D from './components/Attitude3D.vue'
-import PitchGauge from './components/PitchGauge.vue'
-import RollGauge from './components/RollGauge.vue'
-import YawGauge from './components/YawGauge.vue'
+import DashboardView from './components/DashboardView.vue'
+import CalibrationView from './components/CalibrationView.vue'
 
-const { state, updateIMU, updateSystemStats, setConnected } = useIMUStore()
+const { updateIMU, updateSystemStats, setConnected } = useIMUStore()
 const SIM_MODE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
-const chartRef = ref(null)
-let uplotInstance = null
+const showMenu = ref(false)
+const currentView = ref('dashboard')
+
+const dashboardRef = ref(null)
+const calibrationRef = ref(null)
+
 let socket = null
 let simTimer = null
 
-const chartData = [Array.from({length: 1000}, (_, i) => i), Array(1000).fill(0), Array(1000).fill(0), Array(1000).fill(0)]
+const setView = (v) => { 
+  currentView.value = v
+  showMenu.value = false 
+}
 
-const getGauge = (type) => ({ ROLL: RollGauge, PITCH: PitchGauge, YAW: YawGauge }[type])
+const handleIncomingData = (r, p, y, g, a, m) => {
+  // Update Global Store (Source of Truth)
+  updateIMU(r, p, y, g, a, m)
 
-const handleIncomingData = (r, p, y) => {
-  updateIMU(r, p, y)
-  chartData[0].push(chartData[0][chartData[0].length - 1] + 1); chartData[0].shift()
-  chartData[1].push(r); chartData[1].shift()
-  chartData[2].push(p); chartData[2].shift()
-  chartData[3].push(y); chartData[3].shift()
-  if (uplotInstance) uplotInstance.setData(chartData)
+  // Update UI Chart/3D (If Dashboard is active)
+  if (dashboardRef.value) {
+    dashboardRef.value.updateChart(r, p, y)
+  }
+
+  if (calibrationRef.value) {
+    calibrationRef.value.updateCalibrationCharts()
+  }
 }
 
 const connectWebSocket = () => {
   socket = new WebSocket(`ws://${window.location.hostname}/ws_imu`)
   socket.binaryType = "arraybuffer"
   socket.onopen = () => setConnected(true)
+  
   socket.onmessage = (event) => {
     const v = new DataView(event.data)
+    
+    // 0-11: Fused Attitude (Floats)
     const r = v.getFloat32(0, true), p = v.getFloat32(4, true), y = v.getFloat32(8, true)
-    updateSystemStats(v.getInt32(12, true), v.getInt32(16, true), v.getBigUint64(20, true), v.getBigUint64(28, true))
-    handleIncomingData(r, p, y)
+    
+    // 12-47: Sensor Vectors (3x3 Floats = 36 bytes)
+    const g = { x: v.getFloat32(12, true), y: v.getFloat32(16, true), z: v.getFloat32(20, true) }
+    const a = { x: v.getFloat32(24, true), y: v.getFloat32(28, true), z: v.getFloat32(32, true) }
+    const m = { x: v.getFloat32(36, true), y: v.getFloat32(40, true), z: v.getFloat32(44, true) }
+
+    // 48-71: System Performance & Hardware Health (Shifted)
+    updateSystemStats(
+      v.getInt32(48, true), v.getInt32(52, true), 
+      v.getBigUint64(56, true), v.getBigUint64(64, true)
+    )
+    
+    // Push through the single pipe
+    handleIncomingData(r, p, y, g, a, m)
   }
+
   socket.onclose = () => {
     setConnected(false); socket = null
     if (!SIM_MODE) setTimeout(connectWebSocket, 2000)
   }
 }
 
+// 5. Lifecycle Hooks
 onMounted(() => {
-  uplotInstance = new uPlot({
-    width: chartRef.value.offsetWidth, height: 250,
-    series: [{}, { stroke: "#485fc7", label: "Roll" }, { stroke: "#ff3860", label: "Pitch" }, { stroke: "#ffdd57", label: "Yaw" }],
-    axes: [{ grid: { stroke: "#f0f0f0" } }, { grid: { stroke: "#f0f0f0" }, values: (u, vals) => vals.map(v => v + "°") }],
-    cursor: { show: false }
-  }, chartData, chartRef.value)
-
-  const resizeObserver = new ResizeObserver(entries => {
-    for (let entry of entries) {
-      // Get the current width of the parent container
-      const newWidth = entry.contentRect.width;
-      
-      // Update uPlot size (Keep height fixed at 250 for readability)
-      if (uplotInstance && newWidth > 0) {
-        uplotInstance.setSize({ width: newWidth, height: 250 })
-      }
-    }
-  })
-
-  // Start watching the chart wrapper
-  if (chartRef.value) {
-    resizeObserver.observe(chartRef.value)
-  }
-
-  // Save observer for cleanup
-  uplotInstance._observer = resizeObserver
-
   if (SIM_MODE) {
     setConnected(true)
-    simTimer = setInterval(() => handleIncomingData(Math.sin(Date.now()/1000)*45, Math.cos(Date.now()/1000)*45, (Date.now()/100)%360), 20)
-  } else connectWebSocket()
+    simTimer = setInterval(() => {
+      const r = Math.sin(Date.now()/1000)*45
+      const p = Math.cos(Date.now()/1000)*45
+      const y = (Date.now()/100)%360
+
+      const g = {
+        x: Math.sin(Date.now()/1000)*45,
+        y: Math.sin(Date.now()/1000)*90,
+        z: Math.sin(Date.now()/1000)*135
+      }
+      const a = {
+        x: Math.sin(Date.now()/1000)*90,
+        y: Math.sin(Date.now()/1000)*45,
+        z: Math.sin(Date.now()/1000)*135
+      }
+      const m = {
+        x: Math.sin(Date.now()/1000)*135,
+        y: Math.sin(Date.now()/1000)*490,
+        z: Math.sin(Date.now()/1000)*45
+      }
+
+
+      // Simulate vectors in dev mode
+      handleIncomingData(r, p, y, g, a, m)
+    }, 20)
+  } else {
+    connectWebSocket()
+  }
 })
 
 onUnmounted(() => {
   if (socket) socket.close()
   if (simTimer) clearInterval(simTimer)
-  if (uplotInstance) {
-    // Stop the observer before destroying the instance
-    if (uplotInstance._observer) {
-      uplotInstance._observer.disconnect()
-    }
-    uplotInstance.destroy()
-  }
 })
 </script>
 
+
 <style scoped>
-.shadow-card { border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #efefef; }
-.uplot-wrapper { width: 100%; display: flex; justify-content: center; background: #fff; }
-:deep(.uplot) { margin: 0 auto; }
-
-.status-indicator { display: inline-flex; align-items: center; justify-content: center; position: relative; }
-.status-indicator .tag { min-width: 85px; transition: all 0.3s ease; position: relative; z-index: 2; }
-.is-live .tag { background-color: #00d1b2 !important; color: white !important; animation: hardcore-pulse 2s infinite; }
-.is-off .tag { background-color: #ff3860 !important; color: white !important; }
-
-/* Force legend labels to pure black for maximum contrast */
-:deep(.u-legend .u-label) {
-  color: #000 !important;
-  font-weight: 800 !important;
+/* Sidebar Shell */
+.sidebar-menu { 
+  position: fixed; 
+  top: 0; 
+  left: -300px; 
+  width: 300px; 
+  height: 100vh; 
+  background: #1a1a1a; 
+  z-index: 1001; 
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+  box-shadow: 5px 0 25px rgba(0,0,0,0.5); 
 }
-
-/* Make the values next to labels darker */
-:deep(.u-legend .u-value) {
-  color: #333 !important;
-  font-weight: 600 !important;
+.sidebar-menu.is-active { left: 0; }
+.sidebar-mask { 
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100vw; 
+  height: 100vh; 
+  background: rgba(0, 0, 0, 0.4); 
+  z-index: 1000; 
 }
-
-/* Ensure axis labels on the canvas are crisp */
-:deep(.u-axis .u-value) {
-  color: #222 !important;
-}
-
-@keyframes hardcore-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(0, 209, 178, 0.7); }
-  70% { box-shadow: 0 0 0 15px rgba(0, 209, 178, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 209, 178, 0); }
-}
+.menu-list a:hover { background-color: #333 !important; }
 </style>

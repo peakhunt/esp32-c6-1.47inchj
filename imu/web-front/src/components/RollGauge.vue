@@ -34,7 +34,7 @@ const props = defineProps({
 const rollStyle = computed(() => ({
   transform: `rotate(${props.roll}deg)`,
   transformOrigin: '50px 50px',
-  transition: 'transform 0.1s linear'
+  // transition: 'transform 0.1s linear'
 }))
 </script>
 
