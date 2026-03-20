@@ -131,15 +131,9 @@ imu_apply_calibration(imu_t* imu)
 static void
 imu_apply_sensor_orientation(imu_t* imu)
 {
-#if 0
-  alignReading(imu->adjusted.accel, imu->accel_align);
-  alignReading(imu->adjusted.gyro, imu->gyro_align);
-  alignReading(imu->adjusted.mag, imu->mag_align);
-#else
   alignReading(imu->raw.accel, imu->accel_align);
   alignReading(imu->raw.gyro, imu->gyro_align);
   alignReading(imu->raw.mag, imu->mag_align);
-#endif
 }
 
 static void
@@ -156,6 +150,20 @@ imu_calc_sensor_value(imu_t* imu)
   imu->data.mag[0] = imu->adjusted.mag[0] * imu->lsb.mag_lsb;
   imu->data.mag[1] = imu->adjusted.mag[1] * imu->lsb.mag_lsb;
   imu->data.mag[2] = imu->adjusted.mag[2] * imu->lsb.mag_lsb;
+
+#if IMU_STORE_UNCALIBRATED_DATA == 1
+  imu->data.u_accel[0] = imu->raw.accel[0] * imu->lsb.accel_lsb;
+  imu->data.u_accel[1] = imu->raw.accel[1] * imu->lsb.accel_lsb;
+  imu->data.u_accel[2] = imu->raw.accel[2] * imu->lsb.accel_lsb;
+
+  imu->data.u_gyro[0] = imu->raw.gyro[0] * imu->lsb.gyro_lsb;
+  imu->data.u_gyro[1] = imu->raw.gyro[1] * imu->lsb.gyro_lsb;
+  imu->data.u_gyro[2] = imu->raw.gyro[2] * imu->lsb.gyro_lsb;
+
+  imu->data.u_mag[0] = imu->raw.mag[0] * imu->lsb.mag_lsb;
+  imu->data.u_mag[1] = imu->raw.mag[1] * imu->lsb.mag_lsb;
+  imu->data.u_mag[2] = imu->raw.mag[2] * imu->lsb.mag_lsb;
+#endif
 
   imu->data.temp = ((float) imu->adjusted.temp) / 333.87f + 21.0f;
 }

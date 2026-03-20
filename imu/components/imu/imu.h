@@ -7,7 +7,9 @@
 #include "mahony.h"
 #include "imu_common.h"
 
-#define USE_MADGWICK      1
+#define USE_MADGWICK                  1
+#define IMU_STORE_UNCALIBRATED_DATA   0
+
 
 typedef enum
 {
@@ -45,6 +47,11 @@ typedef struct
   float     accel[3];             // in G
   float     gyro[3];              // in degrees per sec  (not radian)
   float     mag[3];               // in uT
+#if IMU_STORE_UNCALIBRATED_DATA == 1
+  float     u_accel[3];           // uncalibrated in G
+  float     u_gyro[3];            // uncalibrated in degrees per sec  (not radian)
+  float     u_mag[3];             // uncalibrated in uT
+#endif
   float     temp;                 // in celcius
   float     orientation[3];       // AHRS output
   float     quaternion[4];
