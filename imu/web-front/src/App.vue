@@ -1,6 +1,70 @@
 <template>
-  <section class="section has-background-light p-3" style="min-height: 100vh;">
-    
+  <div class="app-shell">
+    <!-- 1. PERMANENT HEADER -->
+    <header class="app-header px-4">
+      <div class="is-flex is-align-items-center is-justify-content-space-between h-100">
+        <!-- Menu Toggle -->
+        <div class="header-side">
+          <a @click="showMenu = true" class="has-text-white is-flex">
+            <Icon icon="mdi:menu" width="28" height="28" />
+          </a>
+        </div>
+
+        <!-- Dynamic Title -->
+        <div class="header-center">
+          <h1 class="title is-5 has-text-white m-0">
+            {{ currentView === 'dashboard' ? 'IMU STATUS' : 'SENSOR CALIBRATION' }}
+          </h1>
+        </div>
+
+        <!-- Live Stats (Updated with your Tag Indicator) -->
+        <div class="header-side has-text-right">
+          <div :class="['status-indicator', imuStore.state.stats.connected ? 'is-live' : 'is-off']">
+            <span class="tag is-rounded has-text-weight-bold is-size-7">
+              {{ imuStore.state.stats.connected ? 'LIVE' : 'OFFLINE' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+
+    <!-- 2. SCROLLABLE CONTENT AREA -->
+    <main class="app-content has-background-light">
+      <div class="container p-3">
+        <DashboardView v-show="currentView === 'dashboard'" ref="dashboardRef" />
+        <CalibrationView v-show="currentView === 'calibration'" ref="calibrationRef" />
+      </div>
+    </main>
+
+    <!-- FOOTER SECTION -->
+    <footer class="app-footer px-4 is-size-7">
+      <div class="is-flex is-justify-content-space-between is-align-items-center h-100">
+        <!-- LEFT: Static Device Info (Hidden on mobile to save space) -->
+        <div class="has-text-grey is-hidden-mobile">
+          ESP32-C6-MPU9250
+        </div>
+
+        <!-- RIGHT: Stats - Wraps gracefully on mobile -->
+        <div class="is-flex is-align-items-center is-flex-wrap-wrap is-justify-content-end" style="gap: 0.5rem 1rem;">
+          <div class="has-text-grey">
+            CPU: <span class="is-family-monospace has-text-black">{{ imuStore.state.cpuUsage }}%</span>
+          </div>
+          <div class="has-text-grey">
+            Sampling Rate: <span class="is-family-monospace has-text-black">{{ imuStore.state.samplingRate }}Hz</span>
+          </div>
+          <div class="has-text-grey">
+            I2C Transactions: <span class="is-family-monospace has-text-black">{{ imuStore.state.i2cTransactions }}</span>
+          </div>
+          <div :class="imuStore.state.i2cFailed > 0 ? 'has-text-danger' : 'has-text-grey-light'">
+            I2C Fail: <span class="is-family-monospace">{{ imuStore.state.i2cFailed }}</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+
+
     <!-- SIDEBAR MENU OVERLAY -->
     <div :class="['sidebar-menu', { 'is-active': showMenu }]">
       <div class="p-5">
@@ -17,37 +81,9 @@
       </div>
     </div>
 
-    <!-- SIDEBAR MASK -->
+    <!-- SIDEBAR & MASK (Outside layout flow) -->
     <div v-if="showMenu" class="sidebar-mask" @click="showMenu = false"></div>
-
-    <div class="container">
-      <!-- HEADER ROW: FIXED 3-COLUMN BOX -->
-      <div class="is-flex is-align-items-center mb-5" style="min-height: 3.5rem;">
-        
-        <!-- LEFT: Fixed width for icon (Ensures clickability) -->
-        <div style="width: 48px; flex-shrink: 0; z-index: 10;">
-          <a @click.stop="showMenu = true" class="has-text-black is-flex is-align-items-center" style="cursor: pointer;">
-            <Icon icon="mdi:menu" width="32" height="32" />
-          </a>
-        </div>
-
-        <!-- CENTER: Title restricted to middle space -->
-        <div style="flex-grow: 1; text-align: center; overflow: hidden;">
-          <h1 class="title is-size-4-mobile is-size-3-tablet has-text-black has-text-weight-black m-0" style="white-space: nowrap;">
-            {{ currentView === 'dashboard' ? 'IMU Status' : 'Calibration' }}
-          </h1>
-        </div>
-
-        <!-- RIGHT: Invisible spacer to balance the icon -->
-        <div style="width: 48px; flex-shrink: 0;"></div>
-      </div>
-
-      <!-- VIEW SWITCHER -->
-      <DashboardView v-show="currentView === 'dashboard'" ref="dashboardRef" />
-      <CalibrationView v-show="currentView === 'calibration'" ref="calibrationRef"/>
-      
-    </div>
-  </section>
+  </div>
 </template>
 
 <script setup>
@@ -57,7 +93,6 @@ import { useIMUStore } from './store/imuStore'
 import DashboardView from './components/DashboardView.vue'
 import CalibrationView from './components/CalibrationView.vue'
 
-const { updateIMU, updateSystemStats, setConnected } = useIMUStore()
 const SIM_MODE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
 const showMenu = ref(false)
@@ -68,6 +103,9 @@ const calibrationRef = ref(null)
 
 let socket = null
 let simTimer = null
+
+const imuStore = useIMUStore()
+const { updateIMU, updateSystemStats, setConnected } = imuStore
 
 const setView = (v) => { 
   currentView.value = v
@@ -193,4 +231,46 @@ onUnmounted(() => {
   z-index: 1000; 
 }
 .menu-list a:hover { background-color: #333 !important; }
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden; /* Prevents body bounce on mobile */
+}
+
+.app-header {
+  height: 3.5rem;
+  background: #1a1a1a;
+  flex-shrink: 0; /* Won't squash */
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.app-content {
+  flex-grow: 1; /* Takes all available space */
+  overflow-y: auto; /* Internal scroll only */
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-footer {
+  min-height: 2rem; /* Minimum height */
+  height: auto;     /* Allows growth if text wraps */
+  background: #ffffff;
+  border-top: 1px solid #ddd;
+  flex-shrink: 0;   /* Keeps the footer from being squashed */
+  padding: 0.25rem 1rem;
+}
+
+@media screen and (max-width: 768px) {
+  /* On mobile, stack things slightly to avoid horizontal scroll */
+  .app-footer .is-flex {
+    justify-content: center !important;
+    text-align: center;
+  }
+}
+
+.header-side { width: 80px; } /* Fixed width to keep title centered */
+.h-100 { height: 100%; }
+
 </style>

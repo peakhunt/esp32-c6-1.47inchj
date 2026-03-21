@@ -1,42 +1,5 @@
 <template>
   <div>
-    <!-- Main Stats Container -->
-    <div class="columns is-mobile is-multiline mb-5 has-background-white shadow-card p-4">
-      <!-- ... (Keep all your STATUS, CPU, LOOP, I2C columns here) ... -->
-      <!-- Use 'state' exactly like you did in App.vue -->
-       <div class="column is-6-mobile has-text-centered">
-          <p class="heading">STATUS</p>
-          <div :class="['status-indicator', state.stats.connected ? 'is-live' : 'is-off']">
-            <span class="tag is-rounded has-text-weight-bold">{{ state.stats.connected ? 'LIVE' : 'OFFLINE' }}</span>
-          </div>
-        </div>
-        <!-- CPU: Half width on mobile -->
-        <div class="column is-6-mobile has-text-centered">
-          <p class="heading">CPU</p>
-          <p class="title is-5 has-text-black">{{ state.cpuUsage }}%</p>
-        </div>
-
-        <!-- LOOP: Half width on mobile -->
-        <div class="column is-6-mobile has-text-centered">
-          <p class="heading">LOOP</p>
-          <p class="title is-5 has-text-black">{{ state.samplingRate }}Hz</p>
-        </div>
-
-        <!-- I2C TX: Half width on mobile -->
-        <div class="column is-6-mobile has-text-centered">
-          <p class="heading">I2C TX</p>
-          <p class="title is-5 has-text-black">{{ state.i2cTransactions.toLocaleString() }}</p>
-        </div>
-
-        <!-- I2C FAIL: Full width on mobile to emphasize errors -->
-        <div class="column is-12-mobile has-text-centered">
-          <p class="heading">I2C FAIL</p>
-          <p class="title is-5" :class="state.i2cFailed > 0 ? 'has-text-danger' : 'has-text-grey-light'">
-          {{ state.i2cFailed }}
-          </p>
-        </div>
-    </div>
-
     <!-- GAUGES SECTION -->
     <div class="columns is-multiline is-variable is-2">
       <div class="column is-4-desktop is-12-mobile" v-for="type in ['ROLL', 'PITCH', 'YAW']" :key="type">

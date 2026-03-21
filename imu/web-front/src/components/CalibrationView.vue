@@ -26,6 +26,13 @@
             <div v-if="sensor.id === 'mag'" class="mag-visual-wrapper" :style="{ '--wrapper-height': chart_height + 'px' }">
               <MagCloudView ref="magCloudRef" />
             </div>
+            <div v-if="sensor.id === 'gyro'" class="mag-visual-wrapper" :style="{ '--wrapper-height': chart_height + 'px' }">
+              <GyroStillnessView ref="gyroStillnessRef"
+                                 :progress="calProgress"
+                                 :calibrating="isCalibrating"
+                                 :noise-level="gyroMagnitude"
+                                 :threshold="0.5"/>
+            </div>
             <div v-else class="visual-container">
               <!-- Gyro/Accel placeholders -->
             </div>
@@ -63,6 +70,7 @@
 import { reactive, onMounted, onUnmounted, ref, computed } from 'vue'
 import { useIMUStore } from '../store/imuStore'
 import MagCloudView from './MagCloudView.vue'
+import GyroStillnessView from './GyroStillnessView.vue'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 
@@ -150,6 +158,39 @@ const runCal = (type, axis = null) => {
   if (type === 'mag' && magCloudRef.value) magCloudRef.value.reset()
   if (type === 'accel' && axis) calState.accel[axis] = true
 }
+
+// State for the calibration process
+const calProgress = ref(0)
+const isCalibrating = ref(false)
+
+// Calculate the live "shakiness" of the gyro
+const gyroMagnitude = computed(() => {
+  const g = imuStore.state.gyro
+  // Magnitude formula: sqrt(x² + y² + z²)
+  return Math.sqrt(g.x**2 + g.y**2 + g.z**2)
+})
+
+// Triggered by your "EXECUTE BIAS" button
+const runGyroCal = () => {
+  isCalibrating.value = true
+  calProgress.value = 0
+  
+  const timer = setInterval(() => {
+    // If the sensor is too shaky (> 0.5 deg/s), reset progress
+    if (gyroMagnitude.value > 0.5) {
+      calProgress.value = 0
+    } else {
+      calProgress.value += 1 // Progresses to 100 over ~5 seconds
+    }
+
+    if (calProgress.value >= 100) {
+      clearInterval(timer)
+      isCalibrating.value = false
+      // Send the final command to the hardware here
+    }
+  }, 50) // Runs at 20Hz
+}
+
 
 </script>
 
