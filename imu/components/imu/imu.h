@@ -95,13 +95,12 @@ extern void imu_gyro_get_calibration(imu_t* imu, float data[3]);
 
 extern void imu_mag_calibration_start(imu_t* imu);
 extern void imu_mag_calibration_finish(imu_t* imu);
-
-#if 0
+extern void imu_mag_get_calibration(imu_t* imu, float bias[3], float scale[3]);
 
 extern void imu_accel_calibration_init(imu_t* imu);
 extern void imu_accel_calibration_step_start(imu_t* imu);
 extern void imu_accel_calibration_step_stop(imu_t* imu);
-extern void imu_accel_calibration_finish(imu_t* imu);
-#endif
+extern bool imu_accel_calibration_finish(imu_t* imu);
+extern void imu_accel_get_calibration(imu_t* imu, float off[3], float scale[3]);
 
 #endif /* !__IMU_DEF_H__ */

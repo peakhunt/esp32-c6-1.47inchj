@@ -15,7 +15,9 @@ static SemaphoreHandle_t      _mutex;
 volatile uint32_t             _sample_rate = 0;
 
 static int64_t                      _cal_start_time = 0;
+static int64_t                      _cal_duration = 0;
 static const int64_t                CAL_DURATION_US = 60 * 1000000; // 60 seconds in microseconds
+static const int64_t                CAL_DURATION_ACCEL_US = 10 * 1000000; // 60 seconds in microseconds
 static imu_task_calib_complete_cb   _calib_cb = NULL;
 static void*                        _calib_cb_arg = NULL;
 
@@ -83,13 +85,20 @@ throttled_imu_data_send(void)
   }
 }
 
+static void
+imu_task_start_calib_timer(uint64_t duration)
+{
+  _cal_duration = duration;
+  _cal_start_time = esp_timer_get_time();
+}
+
 static bool
 imu_task_handle_calibration_timer(void)
 {
   int64_t current_time = esp_timer_get_time();
   int64_t elapsed = current_time - _cal_start_time;
 
-  if(elapsed >= CAL_DURATION_US)
+  if(elapsed >= _cal_duration)
   {
     switch(_imu.mode)
     {
@@ -111,8 +120,12 @@ imu_task_handle_calibration_timer(void)
           _imu.cal.gyro_off[1],
           _imu.cal.gyro_off[2]);
       break;
+
     case imu_mode_accel_calibrating:
+      imu_accel_calibration_step_stop(&_imu);
+      ESP_LOGI(TAG, "stopping accel sensor step calibration");
       break;
+
     default:
       break;
     }
@@ -200,7 +213,7 @@ imu_task_start_gyro_calibration(imu_task_calib_complete_cb cb, void* data)
   _calib_cb = cb;
   _calib_cb_arg = data;
   imu_gyro_calibration_start(&_imu);
-  _cal_start_time = esp_timer_get_time();
+  imu_task_start_calib_timer(CAL_DURATION_US);
   ESP_LOGI(TAG, "starting gyro calibration");
   xSemaphoreGive(_mutex);
 }
@@ -220,7 +233,7 @@ imu_task_start_mag_calibration(imu_task_calib_complete_cb cb, void* data)
   _calib_cb = cb;
   _calib_cb_arg = data;
   imu_mag_calibration_start(&_imu);
-  _cal_start_time = esp_timer_get_time();
+  imu_task_start_calib_timer(CAL_DURATION_US);
   ESP_LOGI(TAG, "starting mag calibration");
   xSemaphoreGive(_mutex);
 }
@@ -230,15 +243,49 @@ imu_task_get_mag_calibration(float bias[3], float scale[3])
 {
   xSemaphoreTake(_mutex, portMAX_DELAY);
   
-  // 1. Hard Iron Bias (Raw LSBs)
-  bias[0] = (float)_imu.cal.mag_bias[0];
-  bias[1] = (float)_imu.cal.mag_bias[1];
-  bias[2] = (float)_imu.cal.mag_bias[2];
+  imu_mag_get_calibration(&_imu, bias, scale);
+  
+  xSemaphoreGive(_mutex);
+}
 
-  // 2. Soft Iron Scale (Convert 4096-base int to 1.0-base float)
-  scale[0] = (float)_imu.cal.mag_scale[0] / 4096.0f;
-  scale[1] = (float)_imu.cal.mag_scale[1] / 4096.0f;
-  scale[2] = (float)_imu.cal.mag_scale[2] / 4096.0f;
+void
+imu_task_start_accel_calibration(bool reset, imu_task_calib_complete_cb cb, void* data)
+{
+  xSemaphoreTake(_mutex, portMAX_DELAY);
+
+  _calib_cb = cb;
+  _calib_cb_arg = data;
+
+  if(reset)
+  {
+    ESP_LOGI(TAG, "resetting accel sensor calibration");
+    imu_accel_calibration_init(&_imu);
+  }
+
+  imu_accel_calibration_step_start(&_imu);
+  ESP_LOGI(TAG, "starting accel sensor step calibration");
+  imu_task_start_calib_timer(CAL_DURATION_ACCEL_US);
+
+  xSemaphoreGive(_mutex);
+}
+
+bool
+imu_task_finish_accel_calibration(void)
+{
+  bool status;
+  xSemaphoreTake(_mutex, portMAX_DELAY);
+  status = imu_accel_calibration_finish(&_imu);
+  ESP_LOGI(TAG, "finishing accel sensor calibration, status %d", status);
+  xSemaphoreGive(_mutex);
+  return status;
+}
+
+void
+imu_task_get_accel_calibration(float offset[3], float scale[3])
+{
+  xSemaphoreTake(_mutex, portMAX_DELAY);
+  
+  imu_accel_get_calibration(&_imu, offset, scale);
   
   xSemaphoreGive(_mutex);
 }

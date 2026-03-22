@@ -84,13 +84,29 @@ accel_calibration_update(int16_t ax, int16_t ay, int16_t az)
   _sample_count[axis_ndx]++;
 }
 
-void
+bool
 accel_calibration_finish(int16_t offsets[3], int16_t gains[3])
 {
   float   tmp[3];
   int32_t sample[3];
+  uint8_t orientation_mask = 0;
+
+  // 1. Safety Check: Verify all 6 orientations were sampled
+  for (int i = 0; i < 6; i++) {
+    if (_sample_count[i] > 0) {
+      orientation_mask |= (1 << i);
+    }
+  }
+
+  // If not all 6 bits are set (0x3F = 0b00111111), abort to avoid division by zero
+  if (orientation_mask != 0x3F) {
+      // Logic: Return current values or set a failure flag
+      // For now, let's just return to prevent a crash
+      return false;
+  }
 
   /* calculate offset */
+  // Ensure your library function handles the 6-point average correctly
   sensorCalibrationSolveForOffset(&_cal_state, tmp);
 
   for(int i = 0; i < 3; i++)
@@ -98,14 +114,16 @@ accel_calibration_finish(int16_t offsets[3], int16_t gains[3])
     _offset[i] = lrintf(tmp[i]);
   }
 
-  /* Not we can offset our accumulated averages samples and calculate scale factors and calculate gains */
+  /* Reset state to calculate scale factors based on the new offsets */
   sensorCalibrationResetState(&_cal_state);
 
   for (int axis = 0; axis < 6; axis++) {
-    sample[0] = _acc_sum[axis][0] / _sample_count[axis] - _offset[0];
-    sample[1] = _acc_sum[axis][1] / _sample_count[axis] - _offset[1];
-    sample[2] = _acc_sum[axis][2] / _sample_count[axis] - _offset[2];
+    // 2. Division Safety: We already checked _sample_count > 0 above
+    sample[0] = (_acc_sum[axis][0] / _sample_count[axis]) - _offset[0];
+    sample[1] = (_acc_sum[axis][1] / _sample_count[axis]) - _offset[1];
+    sample[2] = (_acc_sum[axis][2] / _sample_count[axis]) - _offset[2];
     
+    // Pass the axis index (0=Z, 1=X, 2=Y based on your getPrimaryAxisIndex logic)
     sensorCalibrationPushSampleForScaleCalculation(&_cal_state, axis / 2, sample, ACCEL_GAIN_REF);
   }
 
@@ -113,14 +131,18 @@ accel_calibration_finish(int16_t offsets[3], int16_t gains[3])
 
   for (int axis = 0; axis < 3; axis++)
   {
+    // 3. Precision: Standard 4096 (12-bit) scaling
     _gain[axis] = lrintf(tmp[axis] * 4096);
   }
 
-  offsets[0] = _offset[0];
-  offsets[1] = _offset[1];
-  offsets[2] = _offset[2];
+  // Final Output
+  offsets[0] = (int16_t)_offset[0];
+  offsets[1] = (int16_t)_offset[1];
+  offsets[2] = (int16_t)_offset[2];
 
-  gains[0] = _gain[0];
-  gains[1] = _gain[1];
-  gains[2] = _gain[2];
+  gains[0] = (int16_t)_gain[0];
+  gains[1] = (int16_t)_gain[1];
+  gains[2] = (int16_t)_gain[2];
+
+  return true;
 }

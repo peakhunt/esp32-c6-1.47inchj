@@ -29,7 +29,7 @@
           <button 
              class="button is-primary is-small is-fullwidth has-text-weight-bold"
              :disabled="!detectedSide || imuStore.state.isCalibrating"
-             @click="runCal('accel', detectedSide)"
+             @click="apiCalibrate('accel', detectedSide)"
              >
              <template v-if="imuStore.state.isCalibrating && currentTarget === detectedSide">
                RECORDING {{ detectedSide }}...
@@ -263,48 +263,51 @@ watch(detectedSide, (newSide) => {
   }
 })
 
-// Add this to CalibrationView.vue <script setup>
-
 const apiCalibrate = async (sensorType, axis = null) => {
-  // 1. Enter Global Lock
   imuStore.setCalibrating(true);
   
-  // 2. Prepare the endpoint (e.g., /api/calibrate/accel?side=+X)
   let url = `/api/calibrate/${sensorType}`;
-  if (axis) url += `?side=${encodeURIComponent(axis)}`;
+  
+  // 1. Build the query string
+  if (axis) {
+    url += `?side=${encodeURIComponent(axis)}`;
+    
+    // If this is the first side, tell the ESP32 to wipe its buffers
+    if (sensorType === 'accel' && completedSides.value.length === 0) {
+      url += `&reset=1`;
+    }
+  }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second limit
+    const timeoutMs = (sensorType === 'accel') ? 30000 : 90000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(url, { 
       method: 'POST',
       signal: controller.signal 
     });
+    
     clearTimeout(timeoutId);
-
     if (!response.ok) throw new Error(`Hardware returned ${response.status}`);
 
-    const result = await response.json();
-
-    if (sensorType === 'gyro') {
-      console.log("Captured Gyro Offsets:", result.offsets);
-      // Optional: Update a 'currentOffsets' object in your store 
-      // so the UI can display the ±0.00x values.
-    }
-    
-    // 3. Handle Success Logic
+    // 2. Local State Updates
     if (sensorType === 'accel' && axis) {
       if (!completedSides.value.includes(axis)) completedSides.value.push(axis);
       calState.accel[axis] = true;
     }
-    
-    console.log(`${sensorType} calibration successful`, result);
+
+    // 3. Final Solve Trigger
+    if (sensorType === 'accel' && completedSides.value.length === 6) {
+      const finishResponse = await fetch('/api/calibrate/accel/finish', { method: 'POST' });
+      const finalResult = await finishResponse.json();
+      console.log("Success:", finalResult);
+      alert("Calibration Saved!");
+    }
 
   } catch (err) {
-    alert(`Calibration Failed: ${err.message}`);
+    alert(`Error: ${err.message}`);
   } finally {
-    // 4. Release Global Lock
     imuStore.setCalibrating(false);
   }
 };

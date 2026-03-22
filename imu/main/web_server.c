@@ -509,7 +509,7 @@ httpd_uri_t gyro_cal_uri =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// HTTP Web Socket Handler for Realtime IMU data
+// Magnetometer calibration
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 static void
@@ -560,6 +560,115 @@ static const httpd_uri_t mag_cal_uri =
   .uri       = "/api/calibrate/mag",
   .method    = HTTP_POST,
   .handler   = mag_cal_post_handler,
+  .user_ctx  = NULL
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Accelerometer calibration
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+static void
+accel_capture_done_worker(void *arg)
+{
+  httpd_req_t *async_req = (httpd_req_t *)arg;
+
+  // We are now safe in the HTTP context
+  httpd_resp_set_type(async_req, "application/json");
+  httpd_resp_sendstr(async_req, "{\"status\":\"captured\"}");
+
+  // Finalize the async handle
+  httpd_req_async_handler_complete(async_req);
+}
+
+static void
+on_accel_calibration_complete_cb(void *arg)
+{
+  httpd_queue_work(_server, accel_capture_done_worker, arg);
+}
+
+static esp_err_t
+accel_cal_post_handler(httpd_req_t *req)
+{
+  char query[32]; // Tight and stack-safe
+  bool reset = false;
+  char side[8] = {0}; 
+
+  // 1. Extract the query string from the URI
+  if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+
+    // 2. Parse 'reset' (returns ESP_OK if found)
+    char r_val[4];
+    if (httpd_query_key_value(query, "reset", r_val, sizeof(r_val)) == ESP_OK) {
+      reset = (r_val[0] == '1');
+    }
+
+    // 3. Parse 'side' (e.g., "+X", "-Z")
+    httpd_query_key_value(query, "side", side, sizeof(side));
+  }
+
+  // 4. Enter Async Mode
+  httpd_req_t *async_req;
+  esp_err_t err = httpd_req_async_handler_begin(req, &async_req);
+  if (err != ESP_OK) return err;
+
+  imu_task_start_accel_calibration(reset, on_accel_calibration_complete_cb, async_req);
+
+  return ESP_OK;
+}
+
+static esp_err_t
+accel_cal_finish_post_handler(httpd_req_t *req)
+{
+  bool status;
+  float offset[3], scale[3];
+  char resp_json[256];
+
+  // 1. Run the solver logic (LU decomposition/Sphere Fit)
+  status = imu_task_finish_accel_calibration();
+
+  if (status) {
+    // 2. SUCCESS: Get the fresh params
+    imu_task_get_accel_calibration(offset, scale);
+
+    // Build success response
+    snprintf(resp_json, sizeof(resp_json), 
+        "{\"status\":\"success\",\"offset\":[%.4f,%.4f,%.4f],\"scale\":[%.4f,%.4f,%.4f]}",
+        offset[0], offset[1], offset[2], scale[0], scale[1], scale[2]);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, resp_json);
+
+    ESP_LOGI(TAG, "Accel calibration successful and saved.");
+  } 
+  else {
+    // 3. FAILURE: Math failed or data incomplete
+    const char *error_msg = "{\"status\":\"error\",\"message\":\"Math failure: singular matrix or insufficient data\"}";
+
+    // Set 400 Bad Request or 500 Internal Error so Vue 'response.ok' becomes false
+    httpd_resp_set_status(req, "400 Bad Request");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, error_msg);
+
+    ESP_LOGW(TAG, "Accel calibration failed.");
+  }
+
+  return ESP_OK;
+}
+
+static const httpd_uri_t accel_cal_uri =
+{
+  .uri       = "/api/calibrate/accel",
+  .method    = HTTP_POST,
+  .handler   = accel_cal_post_handler,
+  .user_ctx  = NULL
+};
+
+static const httpd_uri_t accel_cal_finish_uri =
+{
+  .uri       = "/api/calibrate/accel/finish",
+  .method    = HTTP_POST,
+  .handler   = accel_cal_finish_post_handler,
   .user_ctx  = NULL
 };
 
@@ -705,6 +814,8 @@ web_server_init(void)
     httpd_register_uri_handler(_server, &sse);
     httpd_register_uri_handler(_server, &gyro_cal_uri);
     httpd_register_uri_handler(_server, &mag_cal_uri);
+    httpd_register_uri_handler(_server, &accel_cal_uri);
+    httpd_register_uri_handler(_server, &accel_cal_finish_uri);
     httpd_register_uri_handler(_server, &ws_imu_uri);
     httpd_register_uri_handler(_server, &common_get_uri);
   }

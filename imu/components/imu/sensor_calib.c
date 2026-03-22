@@ -169,16 +169,38 @@ sensorCalibrationSolveForOffset(sensor_calib_t * state, float result[3])
   }
 }
 
+#include <string.h>
+#include <math.h>
 
 void
 sensorCalibrationSolveForScale(sensor_calib_t * state, float result[3])
 {
   float beta[4];
+  float XtX_copy[4][4];
+  float XtY_copy[4];
   int   i;
-  sensorCalibration_SolveLGS(state->XtX, beta, state->XtY);
 
+  // 1. CLONE the state into local memory
+  // This is CRITICAL because sensorCalibration_SolveLGS (gaussLR) 
+  // modifies the matrix in-place during LU decomposition.
+  memcpy(XtX_copy, state->XtX, sizeof(XtX_copy));
+  memcpy(XtY_copy, state->XtY, sizeof(XtY_copy));
+
+  // 2. Solve the Linear Equation
+  // If the sensor wasn't moved enough, XtX_copy[i][i] might be 0, 
+  // causing a NaN (Not a Number) result here.
+  sensorCalibration_SolveLGS(XtX_copy, beta, XtY_copy);
+
+  // 3. Extract and Sanitize Results
   for (i = 0; i < 3; i++)
   {
-    result[i] = sqrtf(beta[i]);
+    // sqrtf(beta[i]) gives the scale factor.
+    // We add a check for NaN or negative values (which shouldn't happen 
+    // with good data but can happen with noise/singular matrices).
+    if (isnan(beta[i]) || beta[i] <= 0.0001f) {
+        result[i] = 1.0f; // Fallback to neutral gain
+    } else {
+        result[i] = sqrtf(beta[i]);
+    }
   }
 }

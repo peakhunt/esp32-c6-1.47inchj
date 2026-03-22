@@ -4,10 +4,7 @@
 #include "imu.h"
 #include "gyro_calibration.h"
 #include "mag_calibration.h"
-
-#if 0
 #include "accel_calibration.h"
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -255,7 +252,7 @@ imu_update(imu_t* imu)
     break;
 
   case imu_mode_accel_calibrating:
-    //accel_calibration_update(imu->raw.accel[0], imu->raw.accel[1], imu->raw.accel[2]);
+    accel_calibration_update(imu->raw.accel[0], imu->raw.accel[1], imu->raw.accel[2]);
     break;
 
   case imu_mode_gyro_calibrating:
@@ -308,7 +305,19 @@ imu_mag_calibration_finish(imu_t* imu)
 #endif
 }
 
-#if 0
+void
+imu_mag_get_calibration(imu_t* imu, float bias[3], float scale[3])
+{
+  bias[0] = imu->cal.mag_bias[0] * imu->lsb.mag_lsb;
+  bias[1] = imu->cal.mag_bias[1] * imu->lsb.mag_lsb;
+  bias[2] = imu->cal.mag_bias[2] * imu->lsb.mag_lsb;
+
+  // 2. Soft Iron Scale (Convert 4096-base int to 1.0-base float)
+  scale[0] = imu->cal.mag_scale[0] / 4096.0f;
+  scale[1] = imu->cal.mag_scale[1] / 4096.0f;
+  scale[2] = imu->cal.mag_scale[2] / 4096.0f;
+}
+
 void
 imu_accel_calibration_init(imu_t* imu)
 {
@@ -327,10 +336,21 @@ imu_accel_calibration_step_stop(imu_t* imu)
   imu->mode = imu_mode_normal;
 }
 
-void
+bool
 imu_accel_calibration_finish(imu_t* imu)
 {
   imu->mode = imu_mode_normal;
-  accel_calibration_finish(imu->cal.accel_off, imu->cal.accel_scale);
+  return accel_calibration_finish(imu->cal.accel_off, imu->cal.accel_scale);
 }
-#endif
+
+void
+imu_accel_get_calibration(imu_t* imu, float off[3], float scale[3])
+{
+  off[0] = imu->cal.accel_off[0] * imu->lsb.accel_lsb;
+  off[1] = imu->cal.accel_off[1] * imu->lsb.accel_lsb;
+  off[2] = imu->cal.accel_off[2] * imu->lsb.accel_lsb;
+
+  scale[0] = imu->cal.accel_scale[0] * 4096;
+  scale[1] = imu->cal.accel_scale[1] * 4096;
+  scale[2] = imu->cal.accel_scale[2] * 4096;
+}

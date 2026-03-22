@@ -5,7 +5,8 @@ set(srcs "mahony.c"
          "imu.c"
          "sensor_calib.c"
          "gyro_calibration.c"
-         "mag_calibration.c")
+         "mag_calibration.c"
+         "accel_calibration.c")
 
 set(includes ".")
 
