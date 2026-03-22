@@ -5,6 +5,7 @@
 #include "imu.h"
 #include "imu_task.h"
 #include "web_server.h"
+#include "imu_config.h"
 
 static const char *TAG = "imu_task";
 
@@ -104,21 +105,23 @@ imu_task_handle_calibration_timer(void)
     {
     case imu_mode_mag_calibrating:
       imu_mag_calibration_finish(&_imu);
-      ESP_LOGI(TAG, "finishing mag calibration %ld %ld %ld %ld %ld %ld",
+      ESP_LOGI(TAG, "finishing mag calibration %d %d %d %d %d %d",
           _imu.cal.mag_bias[0],
           _imu.cal.mag_bias[1],
           _imu.cal.mag_bias[2],
           _imu.cal.mag_scale[0],
           _imu.cal.mag_scale[1],
           _imu.cal.mag_scale[2]);
+      imu_config_update_mag_calib(_imu.cal.mag_bias, _imu.cal.mag_scale);
       break;
 
     case imu_mode_gyro_calibrating:
       imu_gyro_calibration_finish(&_imu);
-      ESP_LOGI(TAG, "finishing gyro calibration %ld %ld %ld",
+      ESP_LOGI(TAG, "finishing gyro calibration %d %d %d",
           _imu.cal.gyro_off[0],
           _imu.cal.gyro_off[1],
           _imu.cal.gyro_off[2]);
+      imu_config_update_gyro_calib(_imu.cal.gyro_off);
       break;
 
     case imu_mode_accel_calibrating:
@@ -135,12 +138,52 @@ imu_task_handle_calibration_timer(void)
 }
 
 static void
+imu_task_init_all(void)
+{
+  imu_sensor_config_t cfg;
+
+  xSemaphoreTake(_mutex, portMAX_DELAY);
+
+  imu_init(&_imu, 500);
+  mpu9250_init(&_mpu9250, MPU9250_Accelerometer_8G, MPU9250_Gyroscope_1000s, &_imu.lsb); 
+
+  imu_config_get_sensor_config(&cfg);
+
+  _imu.cal.accel_off[0] = cfg.accel_off[0];
+  _imu.cal.accel_off[1] = cfg.accel_off[1];
+  _imu.cal.accel_off[2] = cfg.accel_off[2];
+
+  _imu.cal.accel_scale[0] = cfg.accel_scale[0];
+  _imu.cal.accel_scale[1] = cfg.accel_scale[1];
+  _imu.cal.accel_scale[2] = cfg.accel_scale[2];
+
+  _imu.cal.gyro_off[0] = cfg.gyro_off[0];
+  _imu.cal.gyro_off[1] = cfg.gyro_off[1];
+  _imu.cal.gyro_off[2] = cfg.gyro_off[2];
+
+  _imu.cal.mag_bias[0] = cfg.mag_bias[0];
+  _imu.cal.mag_bias[1] = cfg.mag_bias[1];
+  _imu.cal.mag_bias[2] = cfg.mag_bias[2];
+
+  _imu.cal.mag_scale[0] = cfg.mag_scale[0];
+  _imu.cal.mag_scale[1] = cfg.mag_scale[1];
+  _imu.cal.mag_scale[2] = cfg.mag_scale[2];
+
+  ESP_LOGI(TAG, "accel_off %d, %d, %d", _imu.cal.accel_off[0], _imu.cal.accel_off[1], _imu.cal.accel_off[2]);
+  ESP_LOGI(TAG, "accel_scale %d, %d, %d", _imu.cal.accel_scale[0], _imu.cal.accel_scale[1], _imu.cal.accel_scale[2]);
+  ESP_LOGI(TAG, "gyro_off %d, %d, %d", _imu.cal.gyro_off[0], _imu.cal.gyro_off[1], _imu.cal.gyro_off[2]);
+  ESP_LOGI(TAG, "mag_bias %d, %d, %d", _imu.cal.mag_bias[0], _imu.cal.mag_bias[1], _imu.cal.mag_bias[2]);
+  ESP_LOGI(TAG, "mag_scale %d, %d, %d", _imu.cal.mag_scale[0], _imu.cal.mag_scale[1], _imu.cal.mag_scale[2]);
+
+  xSemaphoreGive(_mutex);
+}
+
+static void
 imu_task(void *arg)
 {
   ESP_LOGI(TAG, "Starting IMU task...");
 
-  imu_init(&_imu, 500);
-  mpu9250_init(&_mpu9250, MPU9250_Accelerometer_8G, MPU9250_Gyroscope_1000s, &_imu.lsb); 
+  imu_task_init_all();
 
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(2); // 2 ms → 500 Hz
@@ -276,6 +319,17 @@ imu_task_finish_accel_calibration(void)
   xSemaphoreTake(_mutex, portMAX_DELAY);
   status = imu_accel_calibration_finish(&_imu);
   ESP_LOGI(TAG, "finishing accel sensor calibration, status %d", status);
+  if (status)
+  {
+    ESP_LOGI(TAG, "finishing accel calibration %d %d %d %d %d %d",
+        _imu.cal.accel_off[0],
+        _imu.cal.accel_off[1],
+        _imu.cal.accel_off[2],
+        _imu.cal.accel_scale[0],
+        _imu.cal.accel_scale[1],
+        _imu.cal.accel_scale[2]);
+    imu_config_update_accel_calib(_imu.cal.accel_off, _imu.cal.accel_scale);
+  }
   xSemaphoreGive(_mutex);
   return status;
 }

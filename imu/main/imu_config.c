@@ -18,11 +18,11 @@ static nvs_helper_schema_def_t    _schema[] =
 {
   NVS_MEMBER(imu_config_t, magic,               "magic",      NVS_TYPE_U32, 0),
   NVS_MEMBER(imu_config_t, revision,            "rev",        NVS_TYPE_U16, 0),
-
   NVS_MEMBER(imu_config_t, sensor.accel_off,    "acc_off",    NVS_TYPE_BLOB, 6),
   NVS_MEMBER(imu_config_t, sensor.accel_scale,  "acc_scale",  NVS_TYPE_BLOB, 6),
   NVS_MEMBER(imu_config_t, sensor.gyro_off,     "gyro_off",   NVS_TYPE_BLOB, 6),
   NVS_MEMBER(imu_config_t, sensor.mag_bias,     "mag_bias",   NVS_TYPE_BLOB, 6),
+  NVS_MEMBER(imu_config_t, sensor.mag_scale,    "mag_scale",  NVS_TYPE_BLOB, 6),
   NVS_MEMBER(imu_config_t, sensor.mag_dec,      "mag_dec",    NVS_TYPE_BLOB, 4),
 };
 
@@ -58,6 +58,12 @@ static const imu_config_t   _default_cfg =
       0,
       0,
       0,
+    },
+    .mag_scale = 
+    {
+      4096,
+      4096,
+      4096,
     },
     .mag_dec = 0.0f,
   },
@@ -102,4 +108,70 @@ imu_config_init(void)
     ESP_LOGI(TAG, "reading system config complete");
   }
   ESP_LOGI(TAG, "config magic: %08x, revision: %d", _live_cfg.magic, _live_cfg.revision);
+}
+
+static void
+imu_conifg_write_all(void)
+{
+  ESP_ERROR_CHECK(nvs_helper_write_all(_schema, IMU_SCHEMA_COUNT, &_live_cfg));
+}
+
+void
+imu_config_update_accel_calib(int16_t off[3], int16_t scale[3])
+{
+  xSemaphoreTake(_nvs_lock, portMAX_DELAY);
+
+  _live_cfg.sensor.accel_off[0] = off[0];
+  _live_cfg.sensor.accel_off[1] = off[1];
+  _live_cfg.sensor.accel_off[2] = off[2];
+  _live_cfg.sensor.accel_scale[0] = scale[0];
+  _live_cfg.sensor.accel_scale[1] = scale[1];
+  _live_cfg.sensor.accel_scale[2] = scale[2];
+
+  imu_conifg_write_all();
+  xSemaphoreGive(_nvs_lock);
+}
+
+void
+imu_config_update_gyro_calib(int16_t off[3])
+{
+  xSemaphoreTake(_nvs_lock, portMAX_DELAY);
+
+  _live_cfg.sensor.gyro_off[0] = off[0];
+  _live_cfg.sensor.gyro_off[1] = off[1];
+  _live_cfg.sensor.gyro_off[2] = off[2];
+
+  imu_conifg_write_all();
+  xSemaphoreGive(_nvs_lock);
+}
+
+void
+imu_config_update_mag_calib(int16_t bias[3], int16_t scale[3])
+{
+  xSemaphoreTake(_nvs_lock, portMAX_DELAY);
+
+  _live_cfg.sensor.mag_bias[0] = bias[0];
+  _live_cfg.sensor.mag_bias[1] = bias[1];
+  _live_cfg.sensor.mag_bias[2] = bias[2];
+
+  _live_cfg.sensor.mag_scale[0] = scale[0];
+  _live_cfg.sensor.mag_scale[1] = scale[1];
+  _live_cfg.sensor.mag_scale[2] = scale[2];
+
+  ESP_LOGI(TAG, "updating mag calibration %d %d %d %d %d %d",
+      bias[0], bias[1], bias[2],
+      scale[0], scale[1], scale[2]);
+
+  imu_conifg_write_all();
+  xSemaphoreGive(_nvs_lock);
+}
+
+void
+imu_config_get_sensor_config(imu_sensor_config_t* cfg)
+{
+  xSemaphoreTake(_nvs_lock, portMAX_DELAY);
+
+  memcpy(cfg, &_live_cfg.sensor, sizeof(imu_sensor_config_t));
+
+  xSemaphoreGive(_nvs_lock);
 }
