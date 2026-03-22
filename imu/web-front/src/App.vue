@@ -20,10 +20,19 @@
           </h1>
         </div>
 
-        <div v-if="imuStore.state.isCalibrating" class="is-flex is-align-items-center ml-3">
-          <span class="loader is-loading mr-2" style="width: 12px; height: 12px;"></span>
-          <span class="is-size-7 has-text-warning has-text-weight-bold">HARDWARE BUSY</span>
+        <!-- Replace your current "Hardware Busy" div with this -->
+        <div v-if="imuStore.state.isCalibrating" class="is-flex is-align-items-center ml-3 px-2 py-1 rounded-sm" style="background: rgba(255,193,7,0.1); border-radius: 4px;">
+          <span class="loader is-loading mr-2" style="width: 14px; height: 14px; border-color: transparent transparent #ffdd57 #ffdd57 !important;"></span>
+          <div class="is-flex is-flex-direction-column" style="line-height: 1;">
+            <span class="is-size-7 has-text-warning has-text-weight-bold uppercase tracking-wide">
+              CALIBRATING...
+            </span>
+            <span class="is-family-monospace has-text-white" style="font-size: 0.65rem;">
+              {{ elapsedSeconds }}s ELAPSED
+            </span>
+          </div>
         </div>
+
 
         <!-- Live Stats (Updated with your Tag Indicator) -->
         <div class="header-side has-text-right">
@@ -95,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useIMUStore } from './store/imuStore'
 import DashboardView from './components/DashboardView.vue'
@@ -114,6 +123,23 @@ let simTimer = null
 
 const imuStore = useIMUStore()
 const { updateIMU, updateSystemStats, setConnected } = imuStore
+
+const elapsedSeconds = ref(0)
+let timerInterval = null
+
+
+watch(() => imuStore.state.isCalibrating, (isBusy) => {
+  if (isBusy) {
+    elapsedSeconds.value = 0
+    timerInterval = setInterval(() => {
+      elapsedSeconds.value++
+    }, 1000)
+  } else {
+    clearInterval(timerInterval)
+    // Keep the final time visible for a second or just reset
+    // elapsedSeconds.value = 0 
+  }
+})
 
 const setView = (v) => { 
   currentView.value = v
@@ -209,6 +235,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval)
   if (socket) socket.close()
   if (simTimer) clearInterval(simTimer)
 })

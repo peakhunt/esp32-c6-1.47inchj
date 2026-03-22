@@ -18,7 +18,10 @@
       <div class="card has-background-white shadow-card">
         <div class="card-content">
           <p class="heading has-text-weight-bold has-text-black mb-4">REAL-TIME TELEMETRY</p>
-          <div ref="chartRef" class="uplot-wrapper"></div>
+          <!-- Chart.js needs a relative container with a height -->
+          <div class="chart-container" style="position: relative; height: 250px; width: 100%;">
+            <canvas ref="chartCanvas"></canvas>
+          </div>
         </div>
       </div>
     </div>
@@ -37,80 +40,95 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useIMUStore } from '../store/imuStore'
-import uPlot from 'uplot'
-import 'uplot/dist/uPlot.min.css'
+import { Chart, registerables } from 'chart.js'
+Chart.register(...registerables)
+
 import Attitude3D from './Attitude3D.vue'
 import PitchGauge from './PitchGauge.vue'
 import RollGauge from './RollGauge.vue'
 import YawGauge from './YawGauge.vue'
 
 const { state } = useIMUStore()
-const chartRef = ref(null)
-let uplotInstance = null
+const chartCanvas = ref(null)
+let chartInstance = null
 
-const chartData = [Array.from({length: 1000}, (_, i) => i), Array(1000).fill(0), Array(1000).fill(0), Array(1000).fill(0)]
+const max_points = 1000
 const getGauge = (type) => ({ ROLL: RollGauge, PITCH: PitchGauge, YAW: YawGauge }[type])
 
-// This is the bridge: App.vue calls this to update the chart
+// CLEAN UPDATE LOGIC
 const updateChart = (r, p, y) => {
-  chartData[0].push(chartData[0][chartData[0].length - 1] + 1); chartData[0].shift()
-  chartData[1].push(r); chartData[1].shift()
-  chartData[2].push(p); chartData[2].shift()
-  chartData[3].push(y); chartData[3].shift()
-  if (uplotInstance) uplotInstance.setData(chartData)
+  // 1. If tab is hidden, do nothing. No data updates, no drawing.
+  if (document.hidden || !chartInstance) return;
+
+  const datasets = chartInstance.data.datasets;
+  const values = [r, p, y];
+
+  // 2. Update each of the 3 series
+  values.forEach((val, i) => {
+    datasets[i].data.push(val);
+    if (datasets[i].data.length > max_points) datasets[i].data.shift();
+  });
+
+  // 3. 'none' mode skips CPU-intensive animations for 50Hz streaming
+  chartInstance.update('none');
 }
 
-// Expose the function so the parent can see it
 defineExpose({ updateChart })
 
 onMounted(() => {
-  uplotInstance = new uPlot({
-    width: chartRef.value.offsetWidth, height: 250,
-    series: [{}, { stroke: "#485fc7", label: "Roll" }, { stroke: "#ff3860", label: "Pitch" }, { stroke: "#2dff27", label: "Yaw" }],
-    axes: [{ grid: { stroke: "#f0f0f0" } }, { grid: { stroke: "#f0f0f0" }, values: (u, vals) => vals.map(v => v + "°") }],
-    cursor: { show: false }
-  }, chartData, chartRef.value)
-
-  const resizeObserver = new ResizeObserver(entries => {
-    for (let entry of entries) {
-      if (uplotInstance && entry.contentRect.width > 0) {
-        uplotInstance.setSize({ width: entry.contentRect.width, height: 250 })
+  const ctx = chartCanvas.value.getContext('2d');
+  
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      // Create empty slots for the timeline
+      labels: Array.from({ length: max_points }, (_, i) => i),
+      datasets: [
+        { label: 'Roll',  yAxisID: 'y', borderColor: '#485fc7', data: Array(max_points).fill(0), pointRadius: 0, borderWidth: 2 },
+        { label: 'Pitch', yAxisID: 'y', borderColor: '#ff3860', data: Array(max_points).fill(0), pointRadius: 0, borderWidth: 2 },
+        { label: 'Yaw',   yAxisID: 'yYaw', borderColor: '#2dff27', data: Array(max_points).fill(0), pointRadius: 0, borderWidth: 2 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false, 
+      scales: {
+        x: { display: false },
+        // Left Axis for Roll/Pitch
+        y: { 
+          type: 'linear', position: 'left',
+          min: -180, max: 180,
+          grid: { color: '#f0f0f0' },
+          ticks: { callback: (v) => v + '°' }
+        },
+        // Right Axis for Yaw (Heading)
+        yYaw: {
+          type: 'linear', position: 'right',
+          min: 0, max: 360,
+          grid: { drawOnChartArea: false }, // Don't double-up the grid lines
+          ticks: { callback: (v) => v + '°', color: '#2dff27' }
+        }
+      },
+      plugins: {
+        legend: { display: true, labels: { color: '#2c3e50', font: { weight: '600' } } }
       }
     }
-  })
-  if (chartRef.value) resizeObserver.observe(chartRef.value)
-  uplotInstance._observer = resizeObserver
+  });
 })
 
 onUnmounted(() => {
-  if (uplotInstance) {
-    if (uplotInstance._observer) uplotInstance._observer.disconnect()
-    uplotInstance.destroy()
-  }
+  if (chartInstance) chartInstance.destroy()
 })
 </script>
 
 <style scoped>
-/* uPlot Layout - Specific to DashboardView.vue */
-.uplot-wrapper { 
-  width: 100%; 
-  display: flex; 
-  justify-content: center; 
-  background: #fff; 
+.chart-container {
+  width: 100%;
+  background: #fff;
 }
-
-:deep(.uplot) { 
-  margin: 0 auto; 
-}
-
-:deep(.u-legend .u-label) {
-  color: #2c3e50 !important; /* A deep, high-contrast grey */
-  font-weight: 600;         /* Slightly bolder for better readability */
-}
-
-/* Optional: Darkens the numerical values shown when hovering */
-:deep(.u-legend .u-value) {
-  color: #000000 !important;
-  font-weight: 700;
+.shadow-card {
+  box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+  border-radius: 8px;
 }
 </style>

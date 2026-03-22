@@ -9,23 +9,24 @@
           <div class="column is-2-tablet is-6-mobile border-right-tablet">
             <div v-for="axis in ['x','y','z']" :key="axis" class="is-flex mb-1 pr-2">
               <span class="is-size-6" :style="{ width: '30px', color: getAxisColor(axis) }">{{ axis.toUpperCase() }}:</span>
-              <span class="is-family-monospace is-size-6 has-text-weight-bold">{{ imuStore.state.accel[axis].toFixed(2) }}</span>
+              <span class="is-family-monospace is-size-6 has-text-weight-bold">{{ displayState.accel[axis].toFixed(2) }}</span>
             </div>
           </div>
           <div class="column is-4-tablet is-6-mobile has-text-centered border-left-tablet">
-            <div class="mag-visual-wrapper" :style="{ '--wrapper-height': chart_height + 'px' }">
+            <div class="mag-visual-wrapper" 
+                 :style="{ height: chart_height + 'px', width: chart_height + 'px' }">
               <AccelCubeView :target="currentTarget" :done-sides="completedSides" />
             </div>
           </div>
           <div class="column is-6-tablet is-12-mobile mt-3-mobile">
-             <div class="chart-wrapper" :style="{ '--wrapper-height': chart_height + 'px' }">
-                <div ref="accelChartEl" class="mini-uplot"></div>
+             <!-- Chart.js needs a relative container and a canvas -->
+             <div class="chart-container" :style="{ height: chart_height + 'px', position: 'relative' }">
+                <canvas ref="accelChartEl"></canvas>
              </div>
           </div>
         </div>
         <!-- ACCEL BUTTON SECTION -->
         <div class="mt-4">
-          <!-- Removed the 'columns' and 'column' wrappers that were squashing it -->
           <button 
              class="button is-primary is-small is-fullwidth has-text-weight-bold"
              :disabled="!detectedSide || imuStore.state.isCalibrating"
@@ -42,12 +43,21 @@
             </template>
           </button>
 
-          <!-- Mini Progress Indicators -->
-          <div class="is-flex is-justify-content-center mt-2" style="gap: 5px;">
-            <div v-for="side in ['+X','-X','+Y','-Y','+Z','-Z']" :key="side"
-                 :class="['tag', calState.accel[side] ? 'is-success' : 'is-light']"
-                 style="width: 35px; height: 8px; padding: 0; border-radius: 2px;">
-            </div>
+          <div class="is-flex is-align-items-center is-justify-content-center" style="gap: 12px;">
+            <button class="button is-ghost p-0 h-auto is-flex"
+                    @click="resetAccelCal"
+                    style="min-height: unset; border: none; background: none;"
+                    title="Reset All Progress">
+              <Icon :icon="trashCanOutline"
+                    class="trash-icon" 
+                    style="font-size: 1.2rem;" />
+            </button>
+              <div class="is-flex" style="gap: 5px;">
+                <div v-for="side in ['+X','-X','+Y','-Y','+Z','-Z']" :key="side"
+                     :class="['tag', calState.accel[side] ? 'is-success' : 'is-light']"
+                     style="width: 35px; height: 8px; padding: 0; border-radius: 2px;">
+                </div>
+              </div>
           </div>
         </div>
       </div>
@@ -61,17 +71,18 @@
           <div class="column is-2-tablet is-6-mobile border-right-tablet">
             <div v-for="axis in ['x','y','z']" :key="axis" class="is-flex mb-1 pr-2">
               <span class="is-size-6" :style="{ width: '30px', color: getAxisColor(axis) }">{{ axis.toUpperCase() }}:</span>
-              <span class="is-family-monospace is-size-6 has-text-weight-bold">{{ imuStore.state.gyro[axis].toFixed(2) }}</span>
+              <span class="is-family-monospace is-size-6 has-text-weight-bold">{{ displayState.gyro[axis].toFixed(2) }}</span>
             </div>
           </div>
           <div class="column is-4-tablet is-6-mobile has-text-centered border-left-tablet">
-            <div class="mag-visual-wrapper" :style="{ '--wrapper-height': chart_height + 'px' }">
+            <div class="mag-visual-wrapper"
+                 :style="{ height: chart_height + 'px', width: chart_height + 'px' }">
               <GyroStillnessView :progress="calProgress" :calibrating="isCalibrating" :noise-level="gyroMagnitude" :threshold="0.5"/>
             </div>
           </div>
           <div class="column is-6-tablet is-12-mobile mt-3-mobile">
-             <div class="chart-wrapper" :style="{ '--wrapper-height': chart_height + 'px' }">
-                <div ref="gyroChartEl" class="mini-uplot"></div>
+             <div class="chart-container" :style="{ height: chart_height + 'px', position: 'relative' }">
+                <canvas ref="gyroChartEl"></canvas>
              </div>
           </div>
         </div>
@@ -91,17 +102,18 @@
           <div class="column is-2-tablet is-6-mobile border-right-tablet">
             <div v-for="axis in ['x','y','z']" :key="axis" class="is-flex mb-1 pr-2">
               <span class="is-size-6" :style="{ width: '30px', color: getAxisColor(axis) }">{{ axis.toUpperCase() }}:</span>
-              <span class="is-family-monospace is-size-6 has-text-weight-bold">{{ imuStore.state.mag[axis].toFixed(1) }}</span>
+              <span class="is-family-monospace is-size-6 has-text-weight-bold">{{ displayState.mag[axis].toFixed(1) }}</span>
             </div>
           </div>
           <div class="column is-4-tablet is-6-mobile has-text-centered border-left-tablet">
-            <div class="mag-visual-wrapper" :style="{ '--wrapper-height': chart_height + 'px' }">
+            <div class="mag-visual-wrapper"
+                 :style="{ height: chart_height + 'px', width: chart_height + 'px' }">
               <MagCloudView ref="magCloudRef" />
             </div>
           </div>
           <div class="column is-6-tablet is-12-mobile mt-3-mobile">
-             <div class="chart-wrapper" :style="{ '--wrapper-height': chart_height + 'px' }">
-                <div ref="magChartEl" class="mini-uplot"></div>
+             <div class="chart-container" :style="{ height: chart_height + 'px', position: 'relative' }">
+                <canvas ref="magChartEl"></canvas>
              </div>
           </div>
         </div>
@@ -110,7 +122,6 @@
                 @click="apiCalibrate('mag')">
           {{ imuStore.state.isCalibrating ? 'HARDWARE BUSY' : 'RESET CLOUD' }}
         </button>
-
       </div>
     </div>
 
@@ -118,18 +129,22 @@
 </template>
 
 <script setup>
+import { Icon } from '@iconify/vue'
+import trashCanOutline from '@iconify-icons/mdi/trash-can-outline'
 import { reactive, onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useIMUStore } from '../store/imuStore'
 import MagCloudView from './MagCloudView.vue'
 import GyroStillnessView from './GyroStillnessView.vue'
 import AccelCubeView from './AccelCubeView.vue'
-import uPlot from 'uplot'
-import 'uplot/dist/uPlot.min.css'
+
+// 1. Switch to Chart.js
+import { Chart, registerables } from 'chart.js'
+Chart.register(...registerables)
 
 const imuStore = useIMUStore()
 const magCloudRef = ref(null)
 
-// Direct Chart Element Refs
+// Refs for the <canvas> elements
 const accelChartEl = ref(null)
 const gyroChartEl = ref(null)
 const magChartEl = ref(null)
@@ -147,21 +162,45 @@ const currentTarget = ref('+Z')
 const completedSides = ref([])
 const chartInstances = {}
 
-const chartData = {
-  gyro: [Array.from({length: max_data}, (_, i) => i), Array(max_data).fill(0), Array(max_data).fill(0), Array(max_data).fill(0)],
-  accel: [Array.from({length: max_data}, (_, i) => i), Array(max_data).fill(0), Array(max_data).fill(0), Array(max_data).fill(0)],
-  mag: [Array.from({length: max_data}, (_, i) => i), Array(max_data).fill(0), Array(max_data).fill(0), Array(max_data).fill(0)]
-}
+// Add this near your other reactive states
+const displayState = reactive({
+  accel: { x: 0, y: 0, z: 0 },
+  gyro: { x: 0, y: 0, z: 0 },
+  mag: { x: 0, y: 0, z: 0 }
+})
 
+let displayUpdateCounter = 0
+
+// 2. Updated Update Logic (The Surgical Fix)
 const updateCalibrationCharts = () => {
+  // THE SLOP-KILLER: If tab is hidden, don't update charts (prevents 0px compression)
+  if (document.hidden) return;
+
   ['gyro', 'accel', 'mag'].forEach(id => {
-    const data = chartData[id]; const sensor = imuStore.state[id]
-    data[0].push(data[0][data[0].length - 1] + 1); data[0].shift()
-    data[1].push(sensor.x); data[1].shift()
-    data[2].push(sensor.y); data[2].shift()
-    data[3].push(sensor.z); data[3].shift()
-    if (chartInstances[id]) chartInstances[id].setData(data)
+    const chart = chartInstances[id]
+    const sensor = imuStore.state[id]
+    if (!chart) return
+
+    // Update each of the 3 series (X, Y, Z)
+    const datasets = chart.data.datasets
+    const values = [sensor.x, sensor.y, sensor.z]
+
+    values.forEach((val, i) => {
+      datasets[i].data.push(val)
+      if (datasets[i].data.length > max_data) datasets[i].data.shift()
+    })
+
+    // 'none' mode is critical for 50Hz performance
+    chart.update('none')
   })
+
+  displayUpdateCounter++
+  if (displayUpdateCounter >= 10) {
+    displayState.accel = { ...imuStore.state.accel }
+    displayState.gyro = { ...imuStore.state.gyro }
+    displayState.mag = { ...imuStore.state.mag }
+    displayUpdateCounter = 0
+  }
 
   if (magCloudRef.value?.addPoint) {
     magCloudRef.value.addPoint(imuStore.state.mag.x, imuStore.state.mag.y, imuStore.state.mag.z)
@@ -173,40 +212,61 @@ defineExpose({ updateCalibrationCharts })
 onMounted(() => {
   window.addEventListener('resize', updateWidth)
 
-  const opts = (cx, cy, cz, unit) => ({
-    width: 0, height: chart_height.value, cursor: { show: false }, select: { show: false }, legend: { show: false },
-    scales: { x: { time: false }, y: { range: (u, min, max) => [min - 0.5, max + 0.5] } },
-    axes: [{ grid: { stroke: "#f0f0f0" } }, { grid: { stroke: "#f0f0f0" }, values: (u, vals) => vals.map(v => v + unit) }],
-    series: [{}, { stroke: cx, width: 2 }, { stroke: cy, width: 2 }, { stroke: cz, width: 2 }],
+  const commonOptions = (unit) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    elements: { point: { radius: 0 }, line: { borderWidth: 2, tension: 0 } },
+    scales: {
+      x: { display: false },
+      y: { 
+        grid: { color: '#f0f0f0' },
+        ticks: { 
+          callback: (v) => v + unit,
+          color: '#2c3e50',
+          font: { weight: '600' }
+        },
+        // Buffer range logic similar to your old uPlot opts
+        suggestedMin: -1.5,
+        suggestedMax: 1.5
+      }
+    },
+    plugins: { legend: { display: false } }
   })
 
-  chartInstances.gyro = new uPlot(opts("#ff0000", "#0000ff", "#00ff00", "°/s"), chartData.gyro, gyroChartEl.value)
-  chartInstances.accel = new uPlot(opts("#ff0000", "#0000ff", "#00ff00", "g"), chartData.accel, accelChartEl.value)
-  chartInstances.mag = new uPlot(opts("#ff0000", "#0000ff", "#00ff00", "µT"), chartData.mag, magChartEl.value)
+  const initChart = (el, unit) => {
+    return new Chart(el.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: Array.from({ length: max_data }, (_, i) => i),
+        datasets: [
+          { borderColor: '#ff0000', data: Array(max_data).fill(0) },
+          { borderColor: '#0000ff', data: Array(max_data).fill(0) },
+          { borderColor: '#00ff00', data: Array(max_data).fill(0) }
+        ]
+      },
+      options: commonOptions(unit)
+    })
+  }
 
-  const ro = new ResizeObserver(() => {
-    chartInstances.accel?.setSize({ width: accelChartEl.value.offsetWidth, height: chart_height.value })
-    chartInstances.gyro?.setSize({ width: gyroChartEl.value.offsetWidth, height: chart_height.value })
-    chartInstances.mag?.setSize({ width: magChartEl.value.offsetWidth, height: chart_height.value })
-  })
-  
-  ro.observe(accelChartEl.value); ro.observe(gyroChartEl.value); ro.observe(magChartEl.value)
-  chartInstances._observer = ro
+  chartInstances.gyro = initChart(gyroChartEl.value, "°/s")
+  chartInstances.accel = initChart(accelChartEl.value, "g")
+  chartInstances.mag = initChart(magChartEl.value, "µT")
 })
 
-// Fix for chart height change when viewport crosses breakpoint
-watch(chart_height, (newH) => {
-  chartInstances.accel?.setSize({ width: accelChartEl.value.offsetWidth, height: newH })
-  chartInstances.gyro?.setSize({ width: gyroChartEl.value.offsetWidth, height: newH })
-  chartInstances.mag?.setSize({ width: magChartEl.value.offsetWidth, height: newH })
+// Keep the internal Chart.js resize handling in sync with your height computed
+watch(chart_height, () => {
+  Object.values(chartInstances).forEach(chart => {
+    if (chart) chart.resize()
+  })
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateWidth)
-  chartInstances._observer?.disconnect()
   Object.values(chartInstances).forEach(i => i?.destroy?.())
 })
 
+// --- REST OF YOUR ORIGINAL LOGIC UNTOUCHED ---
 const runCal = (type, axis = null) => {
   if (type === 'mag' && magCloudRef.value) magCloudRef.value.reset()
   if (type === 'accel' && axis) {
@@ -223,129 +283,118 @@ const gyroMagnitude = computed(() => {
 })
 
 const runGyroCal = () => {
-  /*
-  isCalibrating.value = true; calProgress.value = 0
-  const timer = setInterval(() => {
-    if (gyroMagnitude.value > 0.5) calProgress.value = 0
-    else calProgress.value += 1
-    if (calProgress.value >= 100) { clearInterval(timer); isCalibrating.value = false }
-  }, 50)
-  */
-  // 1. Lock the whole app
   imuStore.setCalibrating(true);
-  console.log("Hardware Lock: ON (5s)");
-
-  // 2. Unlock after 5 seconds
   setTimeout(() => {
     imuStore.setCalibrating(false);
-    console.log("Hardware Lock: OFF");
   }, 5000);
 }
 
 const detectedSide = computed(() => {
   const a = imuStore.state.accel;
-  const threshold = 0.2; // 0.8g to 1.2g range
-  
-  if (a.z > (1.0 - threshold)) return '+Z';
-  if (a.z < (-1.0 + threshold)) return '-Z';
-  if (a.x > (1.0 - threshold)) return '+X';
-  if (a.x < (-1.0 + threshold)) return '-X';
-  if (a.y > (1.0 - threshold)) return '+Y';
-  if (a.y < (-1.0 + threshold)) return '-Y';
-  
-  return null; // Not leveled or moving
+  const threshold = 0.2; 
+  if (a.z < (-1.0 + threshold)) return '+Z';
+  if (a.z > (1.0 - threshold))  return '-Z';
+  if (a.x < (-1.0 + threshold)) return '+X';
+  if (a.x > (1.0 - threshold))  return '-X';
+  if (a.y < (-1.0 + threshold)) return '+Y';
+  if (a.y > (1.0 - threshold))  return '-Y';
+  return null;
 });
 
 watch(detectedSide, (newSide) => {
-  // If we detect a valid side (+X, -Z, etc.), update the cube's target face
-  if (newSide) {
-    currentTarget.value = newSide
-  }
+  if (newSide) currentTarget.value = newSide
 })
 
 const apiCalibrate = async (sensorType, axis = null) => {
   imuStore.setCalibrating(true);
-  
   let url = `/api/calibrate/${sensorType}`;
-  
-  // 1. Build the query string
   if (axis) {
     url += `?side=${encodeURIComponent(axis)}`;
-    
-    // If this is the first side, tell the ESP32 to wipe its buffers
-    if (sensorType === 'accel' && completedSides.value.length === 0) {
-      url += `&reset=1`;
-    }
+    if (sensorType === 'accel' && completedSides.value.length === 0) url += `&reset=1`;
   }
-
   try {
     const controller = new AbortController();
     const timeoutMs = (sensorType === 'accel') ? 30000 : 90000;
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    const response = await fetch(url, { 
-      method: 'POST',
-      signal: controller.signal 
-    });
-    
+    const response = await fetch(url, { method: 'POST', signal: controller.signal });
     clearTimeout(timeoutId);
     if (!response.ok) throw new Error(`Hardware returned ${response.status}`);
-
-    // 2. Local State Updates
     if (sensorType === 'accel' && axis) {
       if (!completedSides.value.includes(axis)) completedSides.value.push(axis);
       calState.accel[axis] = true;
     }
-
-    // 3. Final Solve Trigger
     if (sensorType === 'accel' && completedSides.value.length === 6) {
       const finishResponse = await fetch('/api/calibrate/accel/finish', { method: 'POST' });
-      const finalResult = await finishResponse.json();
-      console.log("Success:", finalResult);
       alert("Calibration Saved!");
     }
-
   } catch (err) {
     alert(`Error: ${err.message}`);
   } finally {
     imuStore.setCalibrating(false);
   }
-};
+}
 
+const resetAccelCal = () => {
+  if (confirm("Clear all captured sides?")) {
+    completedSides.value = [];
+    Object.keys(calState.accel).forEach(k => calState.accel[k] = false);
+  }
+}
 </script>
 
 <style scoped>
-.chart-wrapper {
+/* The stable house for Chart.js */
+.chart-container {
   display: block;
   width: 100%;
-  height: var(--wrapper-height, 250px);
   position: relative;
-}
-.mini-uplot {
-  width: 100% !important;
-  height: 100% !important;
   background: #fafafa;
   border-radius: 4px;
+  overflow: hidden;
 }
+
+/* Canvas needs to be block-level to prevent baseline spacing slop */
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 @media screen and (min-width: 769px) {
   .border-right-tablet { border-right: 1px solid #eee; }
   .border-left-tablet { border-left: 1px solid #eee; }
 }
+
 @media screen and (max-width: 768px) {
   .mt-3-mobile { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #f5f5f5; }
 }
+
 .is-family-monospace { font-family: 'Courier New', Courier, monospace; }
 .shadow-card { border-radius: 12px; border: 1px solid #efefef; }
-.button.is-extra-small { font-size: 0.6rem; height: 1.8rem; padding: 0; }
+
 .mag-visual-wrapper {
   position: relative;
-  width: var(--wrapper-height, 250px); 
-  height: var(--wrapper-height, 250px);
+  /* Remove the var() fallback, Vue :style will override this */
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
+
 .mag-visual-wrapper > * { width: 100%; height: 100%; }
+
+.trash-icon {
+  color: #b5b5b5; 
+  transition: color 0.2s ease;
+  cursor: pointer;
+}
+
+.trash-icon:hover {
+  color: #ff3860 !important; 
+}
+
+.is-flex.is-align-items-center {
+  min-height: 24px;
+}
 </style>
