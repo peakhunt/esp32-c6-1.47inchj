@@ -75,7 +75,7 @@ static const imu_config_t   _default_cfg =
   // --- WIFI DEFAULTS ---
   .wifi = 
   {
-    .sta_enabled  = true,
+    .sta_enabled  = false,
     .sta_ssid     = "apname",
     .sta_password = "",
 

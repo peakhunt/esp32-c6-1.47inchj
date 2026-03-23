@@ -545,6 +545,14 @@ static const httpd_uri_t imu_settings =
 // HTTP WIFI Config
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+static void
+reboot_task(void *pvParameters)
+{
+  vTaskDelay(pdMS_TO_TICKS(2000));
+  ESP_LOGI("web_server", "Rebooting system for WiFi changes...");
+  esp_restart();
+}
+
 static esp_err_t
 wifi_settings_post_handler(httpd_req_t *req)
 {
@@ -625,10 +633,14 @@ wifi_settings_post_handler(httpd_req_t *req)
 
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-  return httpd_resp_send(req, buf, strlen(buf));
+  esp_err_t res = httpd_resp_send(req, buf, strlen(buf));
 
-  //vTaskDelay(pdMS_TO_TICKS(2000));
-  //esp_restart();
+  // 6. DELAYED RESET
+  // We start a small task to wait 2 seconds before rebooting,
+  // giving the web client enough time to receive the HTTP 200 OK.
+  xTaskCreate(reboot_task, "reboot_task", 2048, NULL, 5, NULL);
+
+  return res;
 }
 
 static httpd_uri_t wifi_settings = 
