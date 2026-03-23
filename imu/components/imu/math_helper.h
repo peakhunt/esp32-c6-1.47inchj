@@ -38,6 +38,7 @@ typedef union
   long    l;
 } float_long_t;
 
+/*
 static inline float invSqrt(float x) {
   float halfx = 0.5f * x;
   float y = x;
@@ -47,6 +48,12 @@ static inline float invSqrt(float x) {
   y = y * (1.5f - (halfx * y * y));
   y = y * (1.5f - (halfx * y * y));
   return y;
+}
+*/
+// on ESP32 C6, this is much better
+static inline
+float invSqrt(float x) {
+    return 1.0f / sqrtf(x);
 }
 
 static inline bool

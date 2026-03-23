@@ -19,6 +19,7 @@
             {{ 
               imuStore.state.currentView === 'dashboard' ? 'IMU STATUS' : 
               imuStore.state.currentView === 'calibration' ? 'SENSOR CALIBRATION' : 
+              imuStore.state.currentView === 'credits' ? 'CREDITS' : 
               'SYSTEM SETTINGS' 
             }}
           </h1>
@@ -56,6 +57,7 @@
         <DashboardView v-show="imuStore.state.currentView === 'dashboard'" ref="dashboardRef" />
         <CalibrationView v-show="imuStore.state.currentView === 'calibration'" ref="calibrationRef" />
         <SettingsView v-show="imuStore.state.currentView === 'settings'" />
+        <CreditsView v-show="imuStore.state.currentView === 'credits'" />
       </div>
     </main>
 
@@ -96,10 +98,14 @@
         </div>
         <aside class="menu">
           <ul class="menu-list">
-            <li><a :class="{'is-active': imuStore.state.currentView === 'dashboard'}" @click="setView('dashboard')">Dashboard</a></li>
-            <li><a :class="{'is-active': imuStore.state.currentView === 'calibration'}" @click="setView('calibration')">IMU Calibration</a></li>
-            <!-- ADD THIS -->
-            <li><a :class="{'is-active': imuStore.state.currentView === 'settings'}" @click="setView('settings')">Settings & Performance</a></li>
+            <li><a :class="{'is-active': imuStore.state.currentView === 'dashboard'}"
+                @click="setView('dashboard')">Dashboard</a></li>
+            <li><a :class="{'is-active': imuStore.state.currentView === 'calibration'}"
+                @click="setView('calibration')">IMU Calibration</a></li>
+            <li><a :class="{'is-active': imuStore.state.currentView === 'settings'}"
+                @click="setView('settings')">Settings & Performance</a></li>
+            <li><a :class="{'is-active': imuStore.state.currentView === 'credits'}"
+                @click="setView('credits')">Credits</a></li>
           </ul>
 
         </aside>
@@ -118,6 +124,7 @@ import { useIMUStore } from './store/imuStore'
 import DashboardView from './components/DashboardView.vue'
 import CalibrationView from './components/CalibrationView.vue'
 import SettingsView from './components/SettingsView.vue'
+import CreditsView from './components/CreditsView.vue'
 
 const SIM_MODE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
