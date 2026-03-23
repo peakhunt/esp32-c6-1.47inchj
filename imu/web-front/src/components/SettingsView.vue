@@ -77,6 +77,26 @@
               </div>
             </template>
           </div>
+          <!-- ACTION BAR: LIVE PARAMETER PATCH -->
+          <div class="mt-5 pt-4 border-top-dashed">
+            <div class="is-flex is-align-items-center is-justify-content-space-between mb-3">
+              <div class="is-flex is-align-items-center">
+                <Icon :icon="tuneIcon" class="has-text-info mr-2" style="font-size: 1rem;" />
+                <span class="is-size-7 has-text-grey-dark has-text-weight-bold uppercase tracking-wide">
+                  Live-patch AHRS fusion logic
+                </span>
+              </div>
+            </div>
+
+            <button class="button is-fullwidth btn-engineering-save"
+                    @click="updateEngineOnly" >
+              <span class="is-flex is-align-items-center">
+                <Icon :icon="autoFixIcon" class="mr-2" style="font-size: 1.1rem;" />
+                APPLY 
+              </span>
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
@@ -104,31 +124,55 @@
               </div>
             </div>
           </div>
-
+          <!-- ACCESS POINT: THE LOCAL DOOR -->
           <div>
             <p class="is-size-7 has-text-grey-darker has-text-weight-bold mb-3 uppercase tracking-wide">Access Point (Local)</p>
             <div class="columns is-multiline">
-              <div class="column is-4 py-1"><label class="label is-size-7 has-text-grey-light uppercase">AP SSID</label>
+              <div class="column is-4 py-1">
+                <label class="label is-size-7 has-text-grey-light uppercase">AP SSID</label>
                 <input class="input is-small is-family-monospace" v-model="localData.wifi.ap_ssid">
               </div>
-              <div class="column is-4 py-1"><label class="label is-size-7 has-text-grey-light uppercase">AP Password</label>
+              <div class="column is-4 py-1">
+                <label class="label is-size-7 has-text-grey-light uppercase">AP Password</label>
                 <input class="input is-small is-family-monospace" type="password" v-model="localData.wifi.ap_password">
               </div>
               <div class="column is-4 py-1">
                 <label class="label is-size-7 has-text-grey-light uppercase">Channel</label>
                 <div class="select is-small is-fullwidth">
                   <select v-model.number="localData.wifi.channel" class="is-family-monospace">
-                    <option v-for="n in 13" :key="n" :value="n">{{ n }}</option>
+                    <option v-for="n in 13" :key="n" :value="n">CH {{ n }}</option>
                   </select>
                 </div>
               </div>
+
+              <div class="column is-6 py-1">
+                <label class="label is-size-7 has-text-grey-light uppercase">AP IP Address</label>
+                <input class="input is-small is-family-monospace" v-model="localData.wifi.ap_ip" placeholder="192.168.4.1">
+              </div>
+              <div class="column is-6 py-1">
+                <label class="label is-size-7 has-text-grey-light uppercase">Subnet Mask</label>
+                <input class="input is-small is-family-monospace" v-model="localData.wifi.ap_mask" placeholder="255.255.255.0">
+              </div>
             </div>
           </div>
-
-          <div class="mt-5 pt-4">
-            <button class="button is-primary is-fullwidth has-text-weight-bold" @click="saveAll">
-              <Icon :icon="contentSaveOutline" class="mr-2" />
-              COMMIT & REBOOT
+          <div class="mt-6 pt-5 border-top-dashed">
+            <div class="is-flex is-align-items-center is-justify-content-space-between mb-4">
+              <div class="is-flex is-align-items-center">
+                <Icon :icon="alertCircleOutline" class="has-text-warning mr-2" style="font-size: 1.2rem;" />
+                <span class="is-size-7 has-text-grey-dark has-text-weight-semibold uppercase tracking-wide">
+                  Hardware restart required to apply network changes
+                </span>
+              </div>
+            </div>
+            
+            <button 
+              class="button is-fullwidth btn-engineering-save"
+              @click="saveAll"
+            >
+              <span class="is-flex is-align-items-center">
+                <Icon :icon="contentSaveOutline" class="mr-2" style="font-size: 1.1rem;" />
+                Apply & REBOOT
+              </span>
             </button>
           </div>
         </div>
@@ -141,8 +185,10 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useIMUStore } from '../store/imuStore'
 import { Icon } from '@iconify/vue'
+import alertCircleOutline from '@iconify-icons/mdi/alert-circle-outline'
 import contentSaveOutline from '@iconify-icons/mdi/content-save-outline'
-import refreshIcon from '@iconify-icons/mdi/refresh'
+import tuneIcon from '@iconify-icons/mdi/tune-vertical'
+import autoFixIcon from '@iconify-icons/mdi/auto-fix'
 
 const imuStore = useIMUStore()
 const { state } = imuStore
@@ -223,4 +269,40 @@ onMounted(syncFromStore)
   color: #7a7a7a !important;
   letter-spacing: 0.05em;
 }
+
+/* Dashed separator for engineering feel */
+.border-top-dashed {
+  border-top: 1px dashed #e0e0e0;
+}
+
+/* The Professional 'No-Slop' Button */
+.btn-engineering-save {
+  background-color: #2c3e50; /* Deep Slate */
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  height: 48px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  font-size: 0.75rem;
+  box-shadow: 0 4px 0 #1a252f; /* Fixed bottom shadow for depth */
+  transition: all 0.1s ease;
+}
+
+.btn-engineering-save:hover {
+  background-color: #34495e;
+  color: white;
+  transform: translateY(1px);
+  box-shadow: 0 3px 0 #1a252f;
+}
+
+.btn-engineering-save:active {
+  transform: translateY(4px);
+  box-shadow: none;
+}
+
+/* Warning text styling */
+.uppercase { text-transform: uppercase; }
+.tracking-wide { letter-spacing: 0.08em; }
 </style>
