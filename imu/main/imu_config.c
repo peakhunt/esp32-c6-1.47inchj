@@ -16,14 +16,14 @@ static SemaphoreHandle_t _nvs_lock;
 //
 static nvs_helper_schema_def_t    _schema[] =
 {
-  NVS_MEMBER(imu_config_t, magic,               "magic",      NVS_TYPE_U32, 0),
-  NVS_MEMBER(imu_config_t, revision,            "rev",        NVS_TYPE_U16, 0),
-  NVS_MEMBER(imu_config_t, sensor.accel_off,    "acc_off",    NVS_TYPE_BLOB, 6),
-  NVS_MEMBER(imu_config_t, sensor.accel_scale,  "acc_scale",  NVS_TYPE_BLOB, 6),
-  NVS_MEMBER(imu_config_t, sensor.gyro_off,     "gyro_off",   NVS_TYPE_BLOB, 6),
-  NVS_MEMBER(imu_config_t, sensor.mag_bias,     "mag_bias",   NVS_TYPE_BLOB, 6),
-  NVS_MEMBER(imu_config_t, sensor.mag_scale,    "mag_scale",  NVS_TYPE_BLOB, 6),
-  NVS_MEMBER(imu_config_t, sensor.mag_dec,      "mag_dec",    NVS_TYPE_BLOB, 4),
+  NVS_MEMBER(imu_config_t, magic,                   "magic",      NVS_TYPE_U32, 0),
+  NVS_MEMBER(imu_config_t, revision,                "rev",        NVS_TYPE_U16, 0),
+  NVS_MEMBER(imu_config_t, sensor.accel_off,        "acc_off",    NVS_TYPE_BLOB, 6),
+  NVS_MEMBER(imu_config_t, sensor.accel_scale,      "acc_scale",  NVS_TYPE_BLOB, 6),
+  NVS_MEMBER(imu_config_t, sensor.gyro_off,         "gyro_off",   NVS_TYPE_BLOB, 6),
+  NVS_MEMBER(imu_config_t, sensor.mag_bias,         "mag_bias",   NVS_TYPE_BLOB, 6),
+  NVS_MEMBER(imu_config_t, sensor.mag_scale,        "mag_scale",  NVS_TYPE_BLOB, 6),
+  NVS_MEMBER(imu_config_t, sensor.mag_declination,  "mag_dec",    NVS_TYPE_BLOB, 4),
 };
 
 //
@@ -65,7 +65,7 @@ static const imu_config_t   _default_cfg =
       4096,
       4096,
     },
-    .mag_dec = 0.0f,
+    .mag_declination = 0.0f,
   },
 };
 
@@ -167,11 +167,11 @@ imu_config_update_mag_calib(int16_t bias[3], int16_t scale[3])
 }
 
 void
-imu_config_get_sensor_config(imu_sensor_config_t* cfg)
+imu_config_get_sensor_config(imu_sensor_calib_data_t* cfg)
 {
   xSemaphoreTake(_nvs_lock, portMAX_DELAY);
 
-  memcpy(cfg, &_live_cfg.sensor, sizeof(imu_sensor_config_t));
+  memcpy(cfg, &_live_cfg.sensor, sizeof(imu_sensor_calib_data_t));
 
   xSemaphoreGive(_nvs_lock);
 }
