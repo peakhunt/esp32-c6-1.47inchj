@@ -178,25 +178,28 @@ imu_update_normal(imu_t* imu)
   imu_apply_calibration(imu);
   imu_calc_sensor_value(imu);
 
-#if USE_MADGWICK == 1
-  madgwick_update(&imu->filter,
-      imu->data.gyro[0],  imu->data.gyro[1],   imu->data.gyro[2],
-      imu->data.accel[0], imu->data.accel[1],  imu->data.accel[2],
-      imu->data.mag[0],   imu->data.mag[1],    imu->data.mag[2]);
+  if(imu->engine_cfg.ahrs_mode == IMU_AHRS_MODE_MADGWICK)
+  {
+    madgwick_update(&imu->filter_madgwick,
+        imu->data.gyro[0],  imu->data.gyro[1],   imu->data.gyro[2],
+        imu->data.accel[0], imu->data.accel[1],  imu->data.accel[2],
+        imu->data.mag[0],   imu->data.mag[1],    imu->data.mag[2]);
 
-  madgwick_get_roll_pitch_yaw(&imu->filter,
-      imu->data.orientation,
-      imu->cal.mag_declination);
-#else
-  mahony_update(&imu->filter,
-      imu->data.gyro[0],  imu->data.gyro[1],   imu->data.gyro[2],
-      imu->data.accel[0], imu->data.accel[1],  imu->data.accel[2],
-      imu->data.mag[0],   imu->data.mag[1],    imu->data.mag[2]);
+    madgwick_get_roll_pitch_yaw(&imu->filter_madgwick,
+        imu->data.orientation,
+        imu->cal.mag_declination);
+  }
+  else
+  {
+    mahony_update(&imu->filter_mahony,
+        imu->data.gyro[0],  imu->data.gyro[1],   imu->data.gyro[2],
+        imu->data.accel[0], imu->data.accel[1],  imu->data.accel[2],
+        imu->data.mag[0],   imu->data.mag[1],    imu->data.mag[2]);
 
-  mahony_get_roll_pitch_yaw(&imu->filter,
-      imu->data.orientation,
-      imu->cal.mag_declination);
-#endif
+    mahony_get_roll_pitch_yaw(&imu->filter_mahony,
+        imu->data.orientation,
+        imu->cal.mag_declination);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -205,11 +208,12 @@ imu_update_normal(imu_t* imu)
 //
 ////////////////////////////////////////////////////////////////////////////////
 void
-imu_init(imu_t* imu, float hz)
+imu_init(imu_t* imu, imu_engine_config_t* cfg, float hz)
 {
   memset(imu, 0, sizeof(imu_t));
 
   imu->mode = imu_mode_normal;
+  memcpy(&imu->engine_cfg, cfg, sizeof(imu_engine_config_t));
 
   imu->cal.accel_scale[0] = 
   imu->cal.accel_scale[1] = 
@@ -225,11 +229,8 @@ imu_init(imu_t* imu, float hz)
 
   imu->update_rate  = hz;
 
-#if USE_MADGWICK == 1
-  madgwick_init(&imu->filter, imu->update_rate);
-#else
-  mahony_init(&imu->filter, imu->update_rate);
-#endif
+  madgwick_init(&imu->filter_madgwick, imu->update_rate, cfg->madgwick_beta);
+  mahony_init(&imu->filter_mahony, imu->update_rate, cfg->mahony_kp, cfg->mahony_ki);
 }
 
 void
@@ -353,4 +354,12 @@ imu_accel_get_calibration(imu_t* imu, float off[3], float scale[3])
   scale[0] = imu->cal.accel_scale[0] / 4096.0f;
   scale[1] = imu->cal.accel_scale[1] / 4096.0f;
   scale[2] = imu->cal.accel_scale[2] / 4096.0f;
+}
+
+void
+imu_config_engine(imu_t* imu, imu_engine_config_t* cfg)
+{
+  memcpy(&imu->engine_cfg, cfg, sizeof(imu_engine_config_t));
+  madgwick_init(&imu->filter_madgwick, imu->update_rate, cfg->madgwick_beta);
+  mahony_init(&imu->filter_mahony, imu->update_rate, cfg->mahony_kp, cfg->mahony_ki);
 }

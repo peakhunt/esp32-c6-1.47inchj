@@ -9,7 +9,7 @@ typedef struct
   float q0, q1, q2, q3;
 } madgwick_t;
 
-extern void madgwick_init(madgwick_t* madgwick, float sample_freq);
+extern void madgwick_init(madgwick_t* madgwick, float sample_freq, float beta);
 extern void madgwick_updateIMU(madgwick_t* madgwick,
                                float gx, float gy, float gz,
                                float ax, float ay, float az);

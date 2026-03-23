@@ -7,7 +7,6 @@
 #include "mahony.h"
 #include "imu_common.h"
 
-#define USE_MADGWICK                  1
 #define IMU_STORE_UNCALIBRATED_DATA   0
 #define IMU_USE_MAG_CALIB_SOFT_IRON   1
 
@@ -17,6 +16,14 @@ typedef enum
   IMU_AHRS_MODE_MAHONY = 0,
   IMU_AHRS_MODE_MADGWICK = 1
 } imu_ahrs_mode_t;
+
+typedef struct 
+{
+  imu_ahrs_mode_t ahrs_mode;      // 0 or 1
+  float           madgwick_beta;
+  float           mahony_kp;
+  float           mahony_ki;
+} imu_engine_config_t;
 
 typedef enum
 {
@@ -69,30 +76,28 @@ typedef struct
 
 typedef struct
 {
-  imu_mode_t                mode;
+  imu_mode_t               mode;
 
-  imu_sensor_data_t         raw;
-  imu_sensor_data_t         adjusted;
+  imu_sensor_data_t        raw;
+  imu_sensor_data_t        adjusted;
+  imu_sensor_calib_data_t  cal;
 
-  imu_sensor_calib_data_t   cal;
+  imu_engine_config_t       engine_cfg;
 
-  imu_sensor_align_t         accel_align;
-  imu_sensor_align_t         gyro_align;
-  imu_sensor_align_t         mag_align;
+  imu_sensor_align_t        accel_align;
+  imu_sensor_align_t        gyro_align;
+  imu_sensor_align_t        mag_align;
 
   imu_raw_to_real_t         lsb;
 
   imu_data_t                data;
 
-#if USE_MADGWICK == 1
-  madgwick_t                filter;
-#else
-  mahony_t                  filter;
-#endif
+  madgwick_t                filter_madgwick;
+  mahony_t                  filter_mahony;
   float                     update_rate;
 } imu_t;
 
-extern void imu_init(imu_t* imu, float hz);
+extern void imu_init(imu_t* imu, imu_engine_config_t* cfg, float hz);
 extern void imu_update(imu_t* imu);
 
 extern void imu_gyro_calibration_start(imu_t* imu);
@@ -108,5 +113,7 @@ extern void imu_accel_calibration_step_start(imu_t* imu);
 extern void imu_accel_calibration_step_stop(imu_t* imu);
 extern bool imu_accel_calibration_finish(imu_t* imu);
 extern void imu_accel_get_calibration(imu_t* imu, float off[3], float scale[3]);
+
+extern void imu_config_engine(imu_t* imu, imu_engine_config_t* cfg);
 
 #endif /* !__IMU_DEF_H__ */

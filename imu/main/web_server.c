@@ -24,6 +24,7 @@
 #include "web_server.h"
 #include "imu_task.h"
 #include "imu_config.h"
+#include "jsmn.h"
 
 #define WEB_SERVER_HTTP_QUERY_KEY_MAX_LEN  (64)
 
@@ -53,6 +54,17 @@ struct file_server_data
 static const char* TAG = "web_server";
 static httpd_handle_t _server = NULL;
 static struct file_server_data *server_data = NULL;
+
+static int
+jsoneq(const char *json, jsmntok_t *tok, const char *s)
+{
+  if (tok->type == JSMN_STRING && (int)strlen(s) == tok->end - tok->start &&
+      strncmp(json + tok->start, s, tok->end - tok->start) == 0) 
+  {
+    return 0;
+  }
+  return -1;
+}
 
 static esp_err_t
 set_content_type_from_file(httpd_req_t *req, const char *filepath)
@@ -377,7 +389,7 @@ static const httpd_uri_t accel_cal_finish_uri =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// HTTP Web Socket Handler for Realtime IMU data
+// HTTP Web Settings 
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 static esp_err_t
@@ -446,6 +458,184 @@ static const httpd_uri_t settings_get_uri =
   .uri       = "/api/settings",
   .method    = HTTP_GET,
   .handler   = settings_get_handler,
+  .user_ctx  = NULL
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// HTTP IMU AHRS config 
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+static esp_err_t
+imu_settings_post_handler(httpd_req_t *req)
+{
+  static char buf[512]; // Stack buffer for IMU JSON
+  int ret, remaining = req->content_len;
+
+  if (remaining >= sizeof(buf)) return httpd_resp_send_500(req);
+
+  // 1. Ingest Payload
+  while (remaining > 0)
+  {
+    if ((ret = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf) - 1))) <= 0) return ESP_FAIL;
+    remaining -= ret;
+  }
+  buf[req->content_len] = '\0';
+
+  // 2. JSMN Setup
+  jsmn_parser p;
+  jsmntok_t t[32]; // 32 tokens is plenty for the IMU block
+
+  jsmn_init(&p);
+  int r = jsmn_parse(&p, buf, strlen(buf), t, 32);
+  if (r < 0) return ESP_FAIL;
+
+  // 3. Prepare the engine config struct
+  imu_engine_config_t engine_cfg;
+  float mag_dec = 0.0f;
+
+  // 4. SURGICAL PARSE (Matching Vue keys)
+  for (int i = 1; i < r; i++)
+  {
+    if (jsoneq(buf, &t[i], "ahrs_mode") == 0)
+    {
+      engine_cfg.ahrs_mode = (strncmp(buf + t[i+1].start, "Madgwick", 8) == 0) 
+        ? IMU_AHRS_MODE_MADGWICK : IMU_AHRS_MODE_MAHONY;
+      i++;
+    } 
+    else if (jsoneq(buf, &t[i], "beta") == 0)
+    {
+      engine_cfg.madgwick_beta = strtof(buf + t[i+1].start, NULL);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "twoKp") == 0)
+    {
+      engine_cfg.mahony_kp = strtof(buf + t[i+1].start, NULL);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "twoKi") == 0)
+    {
+      engine_cfg.mahony_ki = strtof(buf + t[i+1].start, NULL);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "mag_declination") == 0)
+    {
+      mag_dec = strtof(buf + t[i+1].start, NULL);
+      i++;
+    }
+  }
+
+  imu_task_config_ahrs(&engine_cfg, mag_dec);
+
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  return httpd_resp_send(req, buf, strlen(buf));
+}
+
+static const httpd_uri_t imu_settings = 
+{
+  .uri       = "/api/settings/imu",
+  .method    = HTTP_POST,
+  .handler   = imu_settings_post_handler,
+  .user_ctx  = NULL
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// HTTP WIFI Config
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+static esp_err_t
+wifi_settings_post_handler(httpd_req_t *req)
+{
+  static char buf[1024]; // WiFi JSON needs a larger buffer for SSIDs/PWs
+  int ret, remaining = req->content_len;
+
+  if (remaining >= sizeof(buf)) return httpd_resp_send_500(req);
+
+  // 1. Ingest Payload
+  while (remaining > 0)
+  {
+    if ((ret = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf) - 1))) <= 0) return ESP_FAIL;
+    remaining -= ret;
+  }
+  buf[req->content_len] = '\0';
+
+  // 2. JSMN Setup
+  jsmn_parser p;
+  jsmntok_t t[64]; // More tokens for nested WiFi object
+
+  jsmn_init(&p);
+  int r = jsmn_parse(&p, buf, strlen(buf), t, 64);
+
+  if (r < 0) return ESP_FAIL;
+
+  // 3. Prepare local WiFi config
+  imu_wifi_config_t w_cfg;
+
+  for (int i = 1; i < r; i++)
+  {
+    int len = t[i+1].end - t[i+1].start;
+    char *val = buf + t[i+1].start;
+
+    if (jsoneq(buf, &t[i], "sta_enabled") == 0)
+    {
+      w_cfg.sta_enabled = (strncmp(val, "true", 4) == 0);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "sta_ssid") == 0)
+    {
+      snprintf(w_cfg.sta_ssid, sizeof(w_cfg.sta_ssid), "%.*s", len, val);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "sta_password") == 0)
+    {
+      snprintf(w_cfg.sta_password, sizeof(w_cfg.sta_password), "%.*s", len, val);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "ap_ssid") == 0)
+    {
+      snprintf(w_cfg.ap_ssid, sizeof(w_cfg.ap_ssid), "%.*s", len, val);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "ap_password") == 0)
+    {
+      snprintf(w_cfg.ap_password, sizeof(w_cfg.ap_password), "%.*s", len, val);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "ap_ip") == 0)
+    {
+      snprintf(w_cfg.ap_ip, sizeof(w_cfg.ap_ip), "%.*s", len, val);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "ap_mask") == 0)
+    {
+      snprintf(w_cfg.ap_mask, sizeof(w_cfg.ap_mask), "%.*s", len, val);
+      i++;
+    }
+    else if (jsoneq(buf, &t[i], "channel") == 0)
+    {
+      w_cfg.channel = atoi(val);
+      i++;
+    }
+  }
+
+  // 5. COMMIT & REBOOT
+  imu_config_update_wifi_config(&w_cfg);
+
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  return httpd_resp_send(req, buf, strlen(buf));
+
+  //vTaskDelay(pdMS_TO_TICKS(2000));
+  //esp_restart();
+}
+
+static httpd_uri_t wifi_settings = 
+{
+  .uri       = "/api/settings/wifi",
+  .method    = HTTP_POST,
+  .handler   = wifi_settings_post_handler,
   .user_ctx  = NULL
 };
 
@@ -590,6 +780,8 @@ web_server_init(void)
     httpd_register_uri_handler(_server, &accel_cal_finish_uri);
     httpd_register_uri_handler(_server, &ws_imu_uri);
     httpd_register_uri_handler(_server, &settings_get_uri);
+    httpd_register_uri_handler(_server, &imu_settings);
+    httpd_register_uri_handler(_server, &wifi_settings);
     httpd_register_uri_handler(_server, &common_get_uri);
   }
 }

@@ -140,13 +140,20 @@ imu_task_handle_calibration_timer(void)
 static void
 imu_task_init_all(void)
 {
+  imu_engine_config_t e_cfg;
+
+  imu_config_get_imu_engine_config(&e_cfg);
+
   xSemaphoreTake(_mutex, portMAX_DELAY);
 
-  imu_init(&_imu, 500);
+  imu_init(&_imu, &e_cfg, 500);
   mpu9250_init(&_mpu9250, MPU9250_Accelerometer_8G, MPU9250_Gyroscope_1000s, &_imu.lsb); 
 
   imu_config_get_sensor_config(&_imu.cal);
 
+  ESP_LOGI(TAG, "ahrs alg: %s", e_cfg.ahrs_mode == IMU_AHRS_MODE_MAHONY ? "mahony" : "madgwick");
+  ESP_LOGI(TAG, "beta: %.3f", e_cfg.madgwick_beta);
+  ESP_LOGI(TAG, "twoKp: %.3f, twoKi: %.3f", e_cfg.mahony_kp, e_cfg.mahony_ki);
   ESP_LOGI(TAG, "accel_off %d, %d, %d", _imu.cal.accel_off[0], _imu.cal.accel_off[1], _imu.cal.accel_off[2]);
   ESP_LOGI(TAG, "accel_scale %d, %d, %d", _imu.cal.accel_scale[0], _imu.cal.accel_scale[1], _imu.cal.accel_scale[2]);
   ESP_LOGI(TAG, "gyro_off %d, %d, %d", _imu.cal.gyro_off[0], _imu.cal.gyro_off[1], _imu.cal.gyro_off[2]);
@@ -329,6 +336,19 @@ imu_task_get_mag_dec(float* dec)
   xSemaphoreTake(_mutex, portMAX_DELAY);
   
   *dec = _imu.cal.mag_declination;
+  
+  xSemaphoreGive(_mutex);
+}
+
+void
+imu_task_config_ahrs(imu_engine_config_t* cfg, float mag_dec)
+{
+  xSemaphoreTake(_mutex, portMAX_DELAY);
+  
+  _imu.cal.mag_declination = mag_dec;
+  imu_config_engine(&_imu, cfg);
+
+  imu_config_update_ahrs(cfg, mag_dec);
   
   xSemaphoreGive(_mutex);
 }

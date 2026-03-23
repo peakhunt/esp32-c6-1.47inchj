@@ -186,6 +186,19 @@ imu_config_update_mag_calib(int16_t bias[3], int16_t scale[3])
 }
 
 void
+imu_config_update_ahrs(imu_engine_config_t* cfg, float mag_dec)
+{
+  xSemaphoreTake(_nvs_lock, portMAX_DELAY);
+
+  memcpy(&_live_cfg.engine, cfg, sizeof(imu_engine_config_t));
+  _live_cfg.sensor.mag_declination = mag_dec;
+
+  imu_conifg_write_all();
+
+  xSemaphoreGive(_nvs_lock);
+}
+
+void
 imu_config_get_sensor_config(imu_sensor_calib_data_t* cfg)
 {
   xSemaphoreTake(_nvs_lock, portMAX_DELAY);
@@ -211,6 +224,17 @@ imu_config_get_wifi_config(imu_wifi_config_t* cfg)
   xSemaphoreTake(_nvs_lock, portMAX_DELAY);
 
   memcpy(cfg, &_live_cfg.wifi, sizeof(imu_wifi_config_t));
+
+  xSemaphoreGive(_nvs_lock);
+}
+
+void
+imu_config_update_wifi_config(imu_wifi_config_t* cfg)
+{
+  xSemaphoreTake(_nvs_lock, portMAX_DELAY);
+
+  memcpy(&_live_cfg.wifi, cfg, sizeof(imu_wifi_config_t));
+  imu_conifg_write_all();
 
   xSemaphoreGive(_nvs_lock);
 }

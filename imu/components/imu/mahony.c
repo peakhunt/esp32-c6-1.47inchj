@@ -2,6 +2,11 @@
 #include "mahony.h"
 #include "math_helper.h"
 
+#define Q0    mahony->q0
+#define Q1    mahony->q1
+#define Q2    mahony->q2
+#define Q3    mahony->q3
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // private definitions
@@ -22,10 +27,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 void
-mahony_init(mahony_t* mahony, float sampleFrequency)
+mahony_init(mahony_t* mahony, float sampleFrequency, float twoKp, float twoKi)
 {
-  mahony->twoKp = twoKpDef; // 2 * proportional gain (Kp)
-  mahony->twoKi = twoKiDef; // 2 * integral gain (Ki)
+  mahony->twoKp = twoKp; // 2 * proportional gain (Kp)
+  mahony->twoKi = twoKi; // 2 * integral gain (Ki)
 
   mahony->q0 = 1.0f;
   mahony->q1 = 0.0f;
@@ -231,21 +236,39 @@ mahony_updateIMU(mahony_t* mahony, float gx, float gy, float gz,
   mahony->q3 *= recipNorm;
 }
 
-
 void
 mahony_get_roll_pitch_yaw(mahony_t* mahony, float data[3], float md)
 {
-#define Q0    mahony->q0
-#define Q1    mahony->q1
-#define Q2    mahony->q2
-#define Q3    mahony->q3
-
+  //
+  // READ and UNDERSTAND THIS. IT'S REALLY FUCKING CONFUSING
+  //
+  // Quaternion doesn't care about AXIS convention or Right hand rule!
+  // As long as we feed sensor data(accel/gyro/mag) in a coherent
+  // convention, the quaternion math should just work fine.
+  // 
+  // But Madgwick/Mahoy isn't just pure quaterion. It expects
+  // sensor inputs in a certain convention. And the implemention
+  // in this source expects it to be NED right handle rule. It's because
+  // the algorithms rely on reference vector in the global world. And
+  // the reference vector is hidden in the cryptic quaternion math in the
+  // code.
+  //
+  // So we are feeding sensor data in NED right hand rule convention.
+  // Accel/Gyro/Mag data are all aligned in that fashion before entering AHRS
+  //
+  // So far so good.
+  //
+  // Now how do we get Euler angles in NED/Right hand rule convention?
+  // This equation is all about the convention.
+  // If you use a different convention like ENU or whatver,
+  // the equation should be changed.
+  //
+  //
   float roll, pitch, yaw;
 
-  roll  = atan2f(Q0*Q1 + Q2*Q3, 0.5f - Q1*Q1 - Q2*Q2);
-  pitch = asinf(-2.0f * (Q1*Q3 - Q0*Q2));
-  yaw   = atan2f(Q1*Q2 + Q0*Q3, 0.5f - Q2*Q2 - Q3*Q3);
-
+  roll  = -atan2f(Q0*Q1 + Q2*Q3, -(0.5f - Q1*Q1 - Q2*Q2));
+  pitch = asinf(2.0f * (Q1*Q3 - Q0*Q2));
+  yaw   = atan2f(-(Q1*Q2 + Q0*Q3), (0.5f - Q2*Q2 - Q3*Q3));
 
   data[0] = roll * 57.29578f;
   data[1] = pitch * 57.29578f;

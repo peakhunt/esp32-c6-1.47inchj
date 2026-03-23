@@ -10,7 +10,7 @@ typedef struct
   float invSampleFreq;
 } mahony_t;
 
-extern void mahony_init(mahony_t* mahony, float sampleFrequency);
+extern void mahony_init(mahony_t* mahony, float sampleFrequency, float twoKp, float twoKi);
 extern void mahony_updateIMU(mahony_t* mahony, float gx, float gy, float gz,
                              float ax, float ay, float az);
 extern void mahony_update(mahony_t* mahony,

@@ -167,7 +167,7 @@
             
             <button 
               class="button is-fullwidth btn-engineering-save"
-              @click="saveAll"
+              @click="saveWiFiOnly"
             >
               <span class="is-flex is-align-items-center">
                 <Icon :icon="contentSaveOutline" class="mr-2" style="font-size: 1.1rem;" />
@@ -226,6 +226,69 @@ watch(() => state.currentView, (newView) => {
 })
 
 onMounted(syncFromStore)
+
+// --- 1. THE LIVE PATCH (IMU Engine) ---
+const updateEngineOnly = async () => {
+  // 1. Prepare the payload (Hardware Sandbox -> POST)
+  const payload = {
+    ahrs_mode: localData.value.imu.ahrs_mode,
+    beta: localData.value.imu.beta,
+    twoKp: localData.value.imu.twoKp,
+    twoKi: localData.value.imu.twoKi,
+    mag_declination: localData.value.mag_declination // Included here
+  }
+
+  try {
+    const res = await fetch('/api/settings/imu', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+
+    if (res.ok) {
+      // 2. THE ECHO: ESP32 confirms what it saved
+      const confirmed = await res.json()
+      
+      // 3. SURGICAL SYNC: Split the data back into the correct Store blocks
+      // Update AHRS params
+      imuStore.updateIMUEngine({
+        ahrs_mode: confirmed.ahrs_mode,
+        beta: confirmed.beta,
+        twoKp: confirmed.twoKp,
+        twoKi: confirmed.twoKi
+      })
+
+      // Update Calibration block specifically for declination
+      imuStore.updateCalibration({ 
+        mag_declination: confirmed.mag_declination 
+      })
+      
+      alert("IMU Engine & Declination Updated")
+    }
+  } catch (e) {
+    alert("Update Failed: " + e.message)
+  }
+}
+
+const saveWiFiOnly = async () => {
+  if (!confirm("Reboot hardware to apply network changes?")) return
+  
+  try {
+    const res = await fetch('/api/settings/wifi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(localData.value.wifi)
+    })
+
+    if (res.ok) {
+      const confirmedWiFi = await res.json()
+      // Sync store before the connection drops for the reboot
+      imuStore.updateWifiSettings(confirmedWiFi)
+      alert("WiFi Updated. Rebooting...")
+    }
+  } catch (e) { alert("Save Failed: " + e.message) }
+}
+
 </script>
 
 <style scoped>

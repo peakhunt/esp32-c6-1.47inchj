@@ -8,13 +8,13 @@
 #define Q3    madgwick->q3
 
 void
-madgwick_init(madgwick_t* madgwick, float sample_freq)
+madgwick_init(madgwick_t* madgwick, float sample_freq, float beta)
 {
   madgwick->sampleFreq = sample_freq;
 
   madgwick->invSampleFreq = 1.0f/sample_freq;
 
-  madgwick->beta  = 2.25f;
+  madgwick->beta  = beta;
 
   madgwick->q0    = 1.0f;
   madgwick->q1    = 0.0f;

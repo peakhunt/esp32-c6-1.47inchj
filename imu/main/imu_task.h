@@ -18,4 +18,6 @@ extern bool imu_task_finish_accel_calibration(void);
 extern void imu_task_get_accel_calibration(float offset[3], float scale[3]);
 extern void imu_task_get_mag_dec(float* dec);
 
+extern void imu_task_config_ahrs(imu_engine_config_t* cfg, float mag_dec);
+
 extern volatile uint32_t _sample_rate;
