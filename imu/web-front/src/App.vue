@@ -17,8 +17,8 @@
         <div class="header-center">
           <h1 class="title is-5 has-text-white m-0 uppercase tracking-wide">
             {{ 
-              currentView === 'dashboard' ? 'IMU STATUS' : 
-              currentView === 'calibration' ? 'SENSOR CALIBRATION' : 
+              imuStore.state.currentView === 'dashboard' ? 'IMU STATUS' : 
+              imuStore.state.currentView === 'calibration' ? 'SENSOR CALIBRATION' : 
               'SYSTEM SETTINGS' 
             }}
           </h1>
@@ -53,9 +53,9 @@
     <!-- 2. SCROLLABLE CONTENT AREA -->
     <main class="app-content has-background-light">
       <div class="container p-3">
-        <DashboardView v-show="currentView === 'dashboard'" ref="dashboardRef" />
-        <CalibrationView v-show="currentView === 'calibration'" ref="calibrationRef" />
-        <SettingsView v-show="currentView === 'settings'" />
+        <DashboardView v-show="imuStore.state.currentView === 'dashboard'" ref="dashboardRef" />
+        <CalibrationView v-show="imuStore.state.currentView === 'calibration'" ref="calibrationRef" />
+        <SettingsView v-show="imuStore.state.currentView === 'settings'" />
       </div>
     </main>
 
@@ -96,10 +96,10 @@
         </div>
         <aside class="menu">
           <ul class="menu-list">
-            <li><a :class="{'is-active': currentView === 'dashboard'}" @click="setView('dashboard')">Dashboard</a></li>
-            <li><a :class="{'is-active': currentView === 'calibration'}" @click="setView('calibration')">IMU Calibration</a></li>
+            <li><a :class="{'is-active': imuStore.state.currentView === 'dashboard'}" @click="setView('dashboard')">Dashboard</a></li>
+            <li><a :class="{'is-active': imuStore.state.currentView === 'calibration'}" @click="setView('calibration')">IMU Calibration</a></li>
             <!-- ADD THIS -->
-            <li><a :class="{'is-active': currentView === 'settings'}" @click="setView('settings')">Settings & Performance</a></li>
+            <li><a :class="{'is-active': imuStore.state.currentView === 'settings'}" @click="setView('settings')">Settings & Performance</a></li>
           </ul>
 
         </aside>
@@ -122,7 +122,6 @@ import SettingsView from './components/SettingsView.vue'
 const SIM_MODE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
 const showMenu = ref(false)
-const currentView = ref('dashboard')
 
 const dashboardRef = ref(null)
 const calibrationRef = ref(null)
@@ -148,7 +147,7 @@ watch(() => imuStore.state.isCalibrating, (isBusy) => {
 })
 
 const setView = (v) => { 
-  currentView.value = v
+  imuStore.setView(v)
   showMenu.value = false 
 }
 
