@@ -49,7 +49,10 @@
             </div>
             <div class="column is-6 py-1">
               <label class="label is-size-7 has-text-grey-light uppercase">Declination (°)</label>
-              <input class="input is-small is-family-monospace" type="number" step="0.001" v-model.number="localData.imu.mag_declination">
+              <input class="input is-small is-family-monospace" type="number" step="0.001" 
+                     v-model.number="localData.imu.mag_declination"
+                     :class="{'is-danger': isNotNumber(localData.imu.mag_declination)}"
+                     @keypress="blockNonNumeric">
             </div>
 
             <!-- DYNAMIC PARAMS -->
@@ -69,11 +72,17 @@
             <template v-if="localData.imu.ahrs_mode === 'Mahony'">
               <div class="column is-6 py-1">
                 <label class="label is-size-7 has-text-grey-light uppercase">twoKp</label>
-                <input class="input is-small is-family-monospace" type="number" step="0.001" v-model.number="localData.imu.twoKp">
+                <input class="input is-small is-family-monospace" type="number" step="0.001" 
+                       v-model.number="localData.imu.twoKp"
+                       :class="{'is-danger': isNotNumber(localData.imu.twoKp) || localData.imu.twoKp < 0}"
+                       @keypress="blockNonNumeric">
               </div>
               <div class="column is-6 py-1">
                 <label class="label is-size-7 has-text-grey-light uppercase">twoKi</label>
-                <input class="input is-small is-family-monospace" type="number" step="0.001" v-model.number="localData.imu.twoKi">
+                <input class="input is-small is-family-monospace" type="number" step="0.001" 
+                       v-model.number="localData.imu.twoKi"
+                       :class="{'is-danger': isNotNumber(localData.imu.twoKi) || localData.imu.twoKi < 0}"
+                       @keypress="blockNonNumeric">
               </div>
             </template>
           </div>
@@ -89,6 +98,7 @@
             </div>
 
             <button class="button is-fullwidth btn-engineering-save"
+                    :disabled="isImuInvalid"
                     @click="updateEngineOnly" >
               <span class="is-flex is-align-items-center">
                 <Icon :icon="autoFixIcon" class="mr-2" style="font-size: 1.1rem;" />
@@ -102,7 +112,17 @@
     </div>
 
     <!-- 3. WIFI (LOCAL DRAFT) -->
-    <div class="column is-12 mt-5 p-0" v-memo="[localData.wifi.sta_enabled, localData.wifi.channel, localData.wifi.ap_ssid, localData.wifi.sta_ssid]">
+    <div class="column is-12 mt-5 p-0" v-memo="[
+      localData.wifi.sta_enabled, 
+      localData.wifi.channel, 
+      localData.wifi.ap_ssid, 
+      localData.wifi.sta_ssid,
+      localData.wifi.ap_ip,
+      localData.wifi.ap_mask,
+      localData.wifi.ap_password,
+      localData.wifi.sta_password,
+      isWifiInvalid
+    ]">
       <div class="card shadow-card has-background-white">
         <div class="card-content px-5 py-5">
           <p class="heading has-text-weight-bold has-text-black mb-5">WIFI INTERFACES</p>
@@ -117,10 +137,16 @@
           <div v-if="localData.wifi.sta_enabled" class="mb-5 pb-5 border-bottom">
             <div class="columns is-multiline">
               <div class="column is-6 py-1"><label class="label is-size-7 has-text-grey-light uppercase">SSID</label>
-                <input class="input is-small is-family-monospace" v-model="localData.wifi.sta_ssid">
+                <input class="input is-small is-family-monospace" 
+                       v-model="localData.wifi.sta_ssid"
+                       maxlength="31"
+                       :class="{'is-danger': !localData.wifi.sta_ssid || localData.wifi.sta_ssid.length > 31}">
               </div>
               <div class="column is-6 py-1"><label class="label is-size-7 has-text-grey-light uppercase">Password</label>
-                <input class="input is-small is-family-monospace" type="password" v-model="localData.wifi.sta_password">
+                <input class="input is-small is-family-monospace" type="password" 
+                       v-model="localData.wifi.sta_password"
+                       maxlength="63"
+                       :class="{'is-danger': localData.wifi.sta_password && localData.wifi.sta_password.length > 63}">
               </div>
             </div>
           </div>
@@ -130,11 +156,17 @@
             <div class="columns is-multiline">
               <div class="column is-4 py-1">
                 <label class="label is-size-7 has-text-grey-light uppercase">AP SSID</label>
-                <input class="input is-small is-family-monospace" v-model="localData.wifi.ap_ssid">
+                <input class="input is-small is-family-monospace" 
+                       v-model="localData.wifi.ap_ssid"
+                       maxlength="31"
+                       :class="{'is-danger': !localData.wifi.ap_ssid || localData.wifi.ap_ssid.length > 31}">
               </div>
               <div class="column is-4 py-1">
                 <label class="label is-size-7 has-text-grey-light uppercase">AP Password</label>
-                <input class="input is-small is-family-monospace" type="password" v-model="localData.wifi.ap_password">
+                <input class="input is-small is-family-monospace" type="password" 
+                       v-model="localData.wifi.ap_password"
+                       maxlength="63"
+                       :class="{'is-danger': localData.wifi.ap_password && localData.wifi.ap_password.length > 63}">
               </div>
               <div class="column is-4 py-1">
                 <label class="label is-size-7 has-text-grey-light uppercase">Channel</label>
@@ -147,11 +179,15 @@
 
               <div class="column is-6 py-1">
                 <label class="label is-size-7 has-text-grey-light uppercase">AP IP Address</label>
-                <input class="input is-small is-family-monospace" v-model="localData.wifi.ap_ip" placeholder="192.168.4.1">
+                <input class="input is-small is-family-monospace" 
+                       v-model="localData.wifi.ap_ip" placeholder="192.168.4.1"
+                       :class="{'is-danger': !isValidIp(localData.wifi.ap_ip)}">
               </div>
               <div class="column is-6 py-1">
                 <label class="label is-size-7 has-text-grey-light uppercase">Subnet Mask</label>
-                <input class="input is-small is-family-monospace" v-model="localData.wifi.ap_mask" placeholder="255.255.255.0">
+                <input class="input is-small is-family-monospace" 
+                       v-model="localData.wifi.ap_mask" placeholder="255.255.255.0"
+                       :class="{'is-danger': !isValidIp(localData.wifi.ap_mask)}">
               </div>
             </div>
           </div>
@@ -167,6 +203,7 @@
             
             <button 
               class="button is-fullwidth btn-engineering-save"
+              :disabled="isWifiInvalid"
               @click="saveWiFiOnly"
             >
               <span class="is-flex is-align-items-center">
@@ -194,6 +231,71 @@ const channels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 
 const imuStore = useIMUStore()
 const { state } = imuStore
+
+const isValidIp = (ip) => {
+  if (!ip || typeof ip !== 'string') return false
+  const parts = ip.trim().split('.')
+  if (parts.length !== 4) return false
+  return parts.every(p => {
+    const n = parseInt(p, 10)
+    // Check if it's purely numeric and within range
+    return /^[0-9]{1,3}$/.test(p) && n >= 0 && n <= 255
+  })
+}
+
+const isNotNumber = (val) => {
+  if (val === null || val === undefined || val === '') return true
+  return isNaN(Number(val))
+}
+
+const blockNonNumeric = (e) => {
+  const char = e.key;
+  const isDigit = /[0-9]/.test(char);
+  const isDot = char === '.';
+  const isMinus = char === '-';
+
+  if (!isDigit && !isDot && !isMinus) {
+    if (char.length === 1) e.preventDefault();
+    return;
+  }
+
+  const val = e.target.value;
+  if (isDot && val.includes('.')) {
+    e.preventDefault();
+  }
+  if (isMinus && val.includes('-')) {
+    e.preventDefault();
+  }
+};
+
+const isImuInvalid = computed(() => {
+  const imu = localData.value.imu
+  if (!imu) return true
+  if (isNotNumber(imu.mag_declination)) return true
+  if (imu.ahrs_mode === 'Mahony') {
+    if (isNotNumber(imu.twoKp) || imu.twoKp < 0) return true
+    if (isNotNumber(imu.twoKi) || imu.twoKi < 0) return true
+  }
+  return false
+})
+
+const isWifiInvalid = computed(() => {
+  const wifi = localData.value.wifi
+  if (!wifi) return true
+  
+  // SSID max 31 (char[32] with null), Password max 63 (char[64] with null)
+  if (!wifi.ap_ssid || wifi.ap_ssid.length > 31) return true
+  if (wifi.ap_password && wifi.ap_password.length > 63) return true
+  
+  if (!isValidIp(wifi.ap_ip)) return true
+  if (!isValidIp(wifi.ap_mask)) return true
+  
+  if (wifi.sta_enabled) {
+    if (!wifi.sta_ssid || wifi.sta_ssid.length > 31) return true
+    if (wifi.sta_password && wifi.sta_password.length > 63) return true
+  }
+  return false
+})
 
 // --- 1. PERFORMANCE (LIVE / NO SANDBOX) ---
 // These update the store and LocalStorage IMMEDIATELY
