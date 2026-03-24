@@ -64,7 +64,7 @@
                     {{ localData.imu.beta?.toFixed(3) }}
                   </span>
                 </div>
-                <input class="slider is-fullwidth is-link is-small m-0" type="range" min="0" max="1" step="0.001"
+                <input class="slider is-fullwidth is-link is-small m-0" type="range" min="0" max="3" step="0.001"
                        v-model.number="localData.imu.beta">
               </div>
             </template>
