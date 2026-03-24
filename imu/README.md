@@ -20,7 +20,7 @@ An IMU (Inertial Measurement Unit) orientation tracking project built on the **E
 
 ## 📸 Screen Shots
 
-| Dashboard | 3D Visualization | System Info |
+| Attitude Dashboard | Sensor Calibration | System Settings |
 | :---: | :---: | :---: |
 | ![Web Dashboard](docs/page1.png) | ![3D View](docs/page2.png) | ![LCD UI](docs/page3.png) |
 
