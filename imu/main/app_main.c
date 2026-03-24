@@ -198,7 +198,8 @@ exit:    //Common return path
   return ret;
 }
 
-static void stats_task(void *arg)
+static void
+stats_task(void *arg)
 {
   uint32_t usage;
 
@@ -214,6 +215,43 @@ static void stats_task(void *arg)
   }
 }
 
+static void
+handle_user_button(bool key_event, uint32_t io_num)
+{
+  static bool key_pressed = false;
+  static uint64_t start_time = 0;
+  uint64_t now;
+
+  if(key_event)
+  {
+    uint32_t io_val = gpio_get_level(io_num);
+    if(key_pressed == false && io_val == 0)
+    {
+      key_pressed = true;
+      start_time = esp_timer_get_time();
+    }
+    else if(key_pressed == true && io_val == 1)
+    {
+      key_pressed = false;
+      ESP_LOGI(TAG, "handling btn press");
+      my_lvgl_app_user_btn_pressed();
+    }
+  }
+  else
+  {
+    if(key_pressed)
+    {
+      now = esp_timer_get_time();
+      // 2 second timeout
+      if (now - start_time >= 2000000ULL)
+      {
+        key_pressed = false;
+        ESP_LOGI(TAG, "handling btn long press");
+        my_lvgl_app_user_btn_long_pressed();
+      }
+    }
+  }
+}
 
 void
 app_main(void)
@@ -224,8 +262,6 @@ app_main(void)
   imu_config_init();
 
   uint32_t  io_num;
-  bool      key_pressed = false;
-  uint32_t  io_val;
 
   /* Configure the peripheral according to the LED type */
   configure_gpio_input();
@@ -248,17 +284,9 @@ app_main(void)
   {
     if (xQueueReceive(gpio_evt_queue, &io_num, CONFIG_BLINK_PERIOD / portTICK_PERIOD_MS))
     {
-      io_val = gpio_get_level(io_num);
-      if (key_pressed == false && io_val == 0)
-      {
-        key_pressed = true;
-        my_lvgl_app_user_btn_pressed();
-      }
-      else if(key_pressed == true && io_val == 1)
-      {
-        key_pressed = false;
-      }
+      handle_user_button(true, io_num);
     }
     change_led();
+    handle_user_button(false, 0);
   }
 }

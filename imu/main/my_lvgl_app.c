@@ -20,6 +20,7 @@
 #include "driver/temperature_sensor.h"
 #include "esp_heap_caps.h"
 #include "imu_task.h"
+#include "st7789_lcd.h"
 
 #define NUM_ELEM(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -95,6 +96,7 @@ my_lvgl_app_page_t app_pages[] =
 };
 
 static uint8_t _current_page = 0;
+static bool _screen_off = false;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 ///
@@ -377,6 +379,8 @@ watt_simulator_cb(lv_timer_t * timer)
 
   ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_handle, &tsens_out));
 
+  if(_screen_off) return;
+
   lvgl_port_lock(0);
 
   extern volatile uint32_t cpu_usage;
@@ -426,6 +430,23 @@ my_lvgl_app_user_btn_pressed(void)
   page = (page + 1) % num_pages;
 
   my_lvgl_app_show_page(page);
+}
+
+void
+my_lvgl_app_user_btn_long_pressed(void)
+{
+  if(_screen_off)
+  {
+    _screen_off = false;
+    st7789_disp_on_off(true);
+    st7789_backlight_on_off(true);
+  }
+  else
+  {
+    _screen_off = true;
+    st7789_disp_on_off(false);
+    st7789_backlight_on_off(false);
+  }
 }
 
 void
