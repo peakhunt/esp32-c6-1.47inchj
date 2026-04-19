@@ -284,8 +284,8 @@ onMounted(() => {
       data: {
         labels: Array.from({ length: max_data }, (_, i) => i),
         datasets: [
-          { borderColor: '#ff0000', data: Array(max_data).fill(0) },
           { borderColor: '#0000ff', data: Array(max_data).fill(0) },
+          { borderColor: '#ff0000', data: Array(max_data).fill(0) },
           { borderColor: '#00ff00', data: Array(max_data).fill(0) }
         ]
       },
